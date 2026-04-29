@@ -143,7 +143,7 @@ horoshop-full-audit/
 ├── references/
 │   ├── api_admin_setup.md         # API user setup guide
 │   ├── api_quickref.md            # Horoshop API reference
-│   ├── audit_checklist.md         # 18 checks with rationale
+│   ├── audit_checklist.md         # 22 checks with rationale
 │   └── fix_recipes.md             # Recipes for each fix
 ├── examples/
 │   └── sample-REPORT.md           # Sample output

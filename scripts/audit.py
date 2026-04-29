@@ -905,6 +905,50 @@ def generate_report(products, categories, html, audit_data):
                     md.append(f"- `{e}`")
                 md.append("")
 
+    # ── Баг-проверки данных (информационные, фиксить в источнике) ─────
+    bug_items = []
+    if n("price_negative"):
+        bug_items.append((
+            f"### I. Від'ємна ціна ({n('price_negative')} шт)",
+            "Очевидний баг вводу. На сайті може ламатись кошик. Часто — переплутані колонки в імпорті.",
+            "Карточка товара в адмінці. Якщо масово — перевір CSV-імпорт.",
+            [(it["article"], it.get("price")) for it in f.get("price_negative", [])[:5]],
+        ))
+    if n("price_old_lower_than_price"):
+        bug_items.append((
+            f"### J. `price_old < price` ({n('price_old_lower_than_price')} шт)",
+            "Стара ціна нижче поточної — зазвичай ціни переплутали місцями при імпорті. На сайті виглядає як «знижка», але насправді ціна виросла.",
+            "Карточка товара / джерело даних імпорту.",
+            [(it["article"], f"price={it['price']}, old={it['price_old']}") for it in f.get("price_old_lower_than_price", [])[:5]],
+        ))
+    if n("price_discount_too_high"):
+        bug_items.append((
+            f"### K. Знижка >80% — підозріло ({n('price_discount_too_high')} шт)",
+            "Зазвичай баг вводу: забутий нуль («99» замість «9.9»), або неправильний десятковий розділювач. Іноді — справжня розпродаж, треба перевіряти вручну.",
+            "Перевір руками, поправ в карточці якщо баг.",
+            [(it["article"], f"{it['real_discount']}% знижки") for it in f.get("price_discount_too_high", [])[:5]],
+        ))
+    if n("dup_main_image"):
+        bug_items.append((
+            f"### L. Дублікати головних зображень ({n('dup_main_image')} груп)",
+            "Кілька товарів використовують одну й ту ж першу картинку. Часто баг імпорту. У каталозі та видачі товари не розрізняються.",
+            "**Каталог → Товар → Зображення** — заміни у дублікатів.",
+            [(grp["articles"][:3], len(grp["articles"])) for grp in f.get("dup_main_image", [])[:3]],
+        ))
+
+    if bug_items:
+        md.append("\n## 🐛 Баг-проверки данных (фіксити в джерелі)\n")
+        md.append("Ці проблеми ми **не виправляємо через API** — зазвичай вони з джерела даних (CSV-імпорт, ERP, ручна правка). Скіл показує їх щоб клієнт знав куди дивитись.\n")
+        for title, why, where, examples in bug_items:
+            md.append(f"\n{title}\n")
+            md.append(f"**Чому важливо:** {why}\n")
+            md.append(f"**Як виправити:** {where}\n")
+            if examples:
+                md.append("**Приклади:**")
+                for ex in examples:
+                    md.append(f"- `{ex}`")
+                md.append("")
+
     md.append("\n## 🚫 Що НЕ змінюємо\n")
     md.append("- robots.txt — стандартний для платформи")
     md.append("- Sitemap.xml — генерується автоматично")

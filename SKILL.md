@@ -166,5 +166,5 @@ HOROSHOP_DOMAIN=... HOROSHOP_LOGIN=... HOROSHOP_PASSWORD=... \
 
 - `references/api_admin_setup.md` — инструкция создания API-юзера (показывай в Шаге 1 если auth не прошёл)
 - `references/api_quickref.md` — справочник API endpoints, какие поля редактируются
-- `references/audit_checklist.md` — полный список 18 проверок (10 API + 8 admin) с обоснованиями
+- `references/audit_checklist.md` — полный список 22 проверок (10 API-фиксов + 8 admin + 4 баг-проверки данных) с обоснованиями
 - `references/fix_recipes.md` — детали каждого из 10 API-фиксов: что именно пишется, какие edge-cases, шаблоны для preview

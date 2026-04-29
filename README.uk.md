@@ -143,7 +143,7 @@ horoshop-full-audit/
 ├── references/
 │   ├── api_admin_setup.md         # Інструкція створити API-юзера
 │   ├── api_quickref.md            # Довідник Horoshop API
-│   ├── audit_checklist.md         # 18 перевірок з обґрунтуваннями
+│   ├── audit_checklist.md         # 22 перевірки з обґрунтуваннями
 │   └── fix_recipes.md             # Рецепти кожного фіксу
 ├── examples/
 │   └── sample-REPORT.md           # Приклад вихідного звіту
