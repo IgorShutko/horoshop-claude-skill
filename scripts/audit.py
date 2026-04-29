@@ -889,6 +889,11 @@ def generate_report(products, categories, html, audit_data):
             md.append(f"- {mark} `{ch}`: {v['filled']}/{v['total']} ({pct}%)")
         md.append("")
 
+    # Брендовый футер
+    md.append("---\n")
+    md.append("🛠 *Згенеровано скілом [horoshop-full-audit](https://github.com/IgorShutko/horoshop-claude-skill) — створено агенцією [Target+](https://www.targetplus-agency.com/) (performance-маркетинг для UA e-commerce).*  ")
+    md.append("*Потрібна допомога з впровадженням? [TG @shutko_ads](https://t.me/shutko_ads) або [заявка через сайт](https://www.targetplus-agency.com/).*")
+
     Path("REPORT.md").write_text("\n".join(md), encoding="utf-8")
     print(f"  REPORT.md: {OUT / 'REPORT.md'}")
 

@@ -1,10 +1,30 @@
 # Horoshop Full Audit — Claude Code Skill
 
-Скилл для Claude Code, который делает полный технический и SEO-аудит интернет-магазина на платформе [Хорошоп](https://horoshop.ua/) через API + парсинг публичных страниц, формирует отчёт и применяет исправления через API после подтверждения.
+> 🛠 Скилл для Claude Code, который делает полный SEO-аудит магазинов на платформе [Хорошоп](https://horoshop.ua/) через API + парсинг публичных страниц, формирует структурированный отчёт и применяет исправления через API после подтверждения.
+
+🌐 [🇷🇺 Русский](README.md) · [🇺🇦 Українська](README.uk.md)
+
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Telegram](https://img.shields.io/badge/Telegram-@shutko__ads-26A5E4?logo=telegram&logoColor=white)](https://t.me/shutko_ads)
+[![Agency](https://img.shields.io/badge/Made%20by-Target%2B%20Agency-FF4500)](https://www.targetplus-agency.com/)
+[![Built for Claude Code](https://img.shields.io/badge/Built%20for-Claude%20Code-D97757)](https://claude.com/claude-code)
+
+---
+
+## 🎯 От [Target+](https://www.targetplus-agency.com/) — агентства performance-маркетинга
+
+Performance-маркетинг для e-commerce и локального бизнеса из Днепра.
+**Meta · TikTok · Google Ads · SEO для Horoshop**.
+
+📺 **TG-канал [@shutko_ads](https://t.me/shutko_ads)** — про рекламу, аналитику и реальные кейсы из агентства.
+
+Этот скилл — open-source инструмент, которым мы сами пользуемся при работе с e-commerce клиентами на Хорошопе. Делимся, потому что лучше когда платформа и подрядчики работают чище.
+
+---
 
 ## Что умеет
 
-**🟢 Через API (10 фиксов):**
+**🟢 Чинит через API (10 пакетных фиксов):**
 - Обнуляет истёкшие таймеры акций (`countdown_end_time`)
 - Заполняет название модификации (`mod_title`) из размера/цвета
 - Пересчитывает `discount` если есть `price_old > price`, но `discount=0`
@@ -16,17 +36,31 @@
 - Чистит inline-стили в HTML описаний
 - Настраивает cross-sell (`accessories`, `alt_parent`)
 
-**🟡 Что выводит для ручной правки в админке:**
-- Длинные `<title>` категорий (>70 симв) — исправляется через SEO-шаблоны
+**🟡 Выписывает в отчёт что чинить вручную в админке:**
+- Длинные `<title>` категорий (>70 симв) — через SEO-шаблоны
 - Пустой `<meta description>` info-страниц
 - Дубли `<h1>` на странице
 - Отсутствие `<h1>` на главной
-- Скрытые товары (`display_in_showcase=0`) — решить судьбу
+- Скрытые товары — решить судьбу
 - Пустой УКТ ВЕД у товаров
 - Пустой SEO-текст у категорий
 
-**🚫 Что НЕ предлагает менять** (это уровень платформы Хорошоп):
-- robots.txt, sitemap.xml, микроразметка, hreflang, canonical, URL-формулы
+**🚫 Не предлагает то, что нельзя изменить ни через API, ни в админке:**
+- robots.txt, sitemap.xml, микроразметку, hreflang, canonical, URL-формулы — это уровень платформы Хорошоп
+
+---
+
+## 📊 Как выглядит результат
+
+Полный пример сгенерированного отчёта по тестовому магазину:
+**[examples/sample-REPORT.md](examples/sample-REPORT.md)**
+
+Скилл выгружает каталог + категории через API, парсит публичные страницы, формирует REPORT.md с разделением:
+- ✅ Что хорошо (не трогаем)
+- 🟢 Что чинит сам через API
+- 🟡 Что нужно сделать вручную в админке (с указанием **где** именно править)
+
+---
 
 ## Установка
 
@@ -36,7 +70,11 @@
 curl -fsSL https://raw.githubusercontent.com/IgorShutko/horoshop-claude-skill/main/install.sh | bash
 ```
 
-### Вариант 2 — вручную
+### Вариант 2 — `.skill` файлом
+
+Скачай `horoshop-full-audit.skill` из [последнего релиза](https://github.com/IgorShutko/horoshop-claude-skill/releases) и дважды кликни — Claude Code установит автоматически.
+
+### Вариант 3 — вручную
 
 ```bash
 git clone https://github.com/IgorShutko/horoshop-claude-skill.git
@@ -47,24 +85,24 @@ chmod +x ~/.claude/skills/horoshop-full-audit/scripts/*.py
 pip install --user requests beautifulsoup4 lxml
 ```
 
-### Вариант 3 — `.skill` файл
-
-Скачай `horoshop-full-audit.skill` из [последнего релиза](https://github.com/IgorShutko/horoshop-claude-skill/releases) и дважды кликни — Claude Code установит автоматически.
+---
 
 ## Использование
 
-После установки в любом чате Claude Code напиши, например:
+После установки в любом чате Claude Code напиши:
 
 ```
 Сделай аудит магазина на хорошопе example.com.ua
 ```
 
 Claude:
-1. Спросит креды (или выдаст инструкцию как создать API-юзера, если их ещё нет)
+1. Спросит креды (или выдаст инструкцию как создать API-юзера)
 2. Прогонит полный аудит — выгрузит каталог, категории, спарсит публичные страницы
 3. Сформирует `REPORT.md` с разделением «через API» / «в админке» / «уже хорошо»
 4. Спросит подтверждение по каждому из 10 API-фиксов
 5. Применит выбранные пакетным импортом (для контентных — с превью)
+
+---
 
 ## Подготовка магазина
 
@@ -75,6 +113,23 @@ Claude:
 3. Передай Claude'у домен + логин/пароль
 
 После аудита можно деактивировать пользователя.
+
+---
+
+## 🤝 Хочешь чтобы за тебя сделали?
+
+Если не хочешь разбираться сам или нужно больше чем технический аудит — **Target+ делает SEO для магазинов на Хорошопе под ключ:**
+
+- Полный технический + контентный аудит
+- Внедрение всех фиксов через API
+- Перенастройка SEO-шаблонов в админке
+- Уникальные описания товаров и SEO-тексты категорий под ключевые запросы
+- Настройка товарных фидов для Rozetka / Google / Meta
+- Performance-кампании в Meta / TikTok / Google для готового магазина
+
+📩 [Заявка через сайт](https://www.targetplus-agency.com/) · 💬 [TG @shutko_ads](https://t.me/shutko_ads)
+
+---
 
 ## Структура
 
@@ -89,22 +144,24 @@ horoshop-full-audit/
 │   ├── api_quickref.md            # Справочник Horoshop API
 │   ├── audit_checklist.md         # 18 проверок с обоснованиями
 │   └── fix_recipes.md             # Рецепты каждого фикса
+├── examples/
+│   └── sample-REPORT.md           # Пример выходного отчёта
 └── evals/
     └── evals.json                 # Test cases для триггера скилла
 ```
 
 ## Принципы
 
-1. **Только то, что мы можем изменить** — через API или вручную в админке. Если делает только платформа (robots, sitemap, microdata) — не пишем.
-2. **Сначала отчёт — потом действия.** Никаких изменений через API без явного подтверждения.
-3. **Обоснование каждой рекомендации** — не «сделать X», а «сделать X, потому что Y».
-4. **Превью для контентных правок** — описания, SEO-тексты, mod_title.
+1. **Только то, что мы можем изменить** — через API или вручную в админке
+2. **Сначала отчёт — потом действия.** Никаких изменений через API без явного подтверждения
+3. **Обоснование каждой рекомендации** — не «сделать X», а «сделать X, потому что Y»
+4. **Превью для контентных правок** — описания, SEO-тексты, mod_title
 
 ## Зависимости
 
 - Python 3.10+
-- `requests`, `beautifulsoup4`, `lxml`, `python-dotenv` (опц.)
-- Claude Code
+- `requests`, `beautifulsoup4`, `lxml`
+- [Claude Code](https://claude.com/claude-code)
 
 ## Лицензия
 
@@ -113,13 +170,13 @@ MIT — см. [LICENSE](LICENSE).
 ## Вклад
 
 PR welcome. Особенно интересно:
-- Поддержка кастомных характеристик других магазинов (сейчас алгоритм гибкий, но edge cases возможны)
+- Поддержка кастомных характеристик других магазинов
 - Дополнительные фиксы на основе реальных кейсов
-- Перевод REPORT.md на русский / английский / украинский (сейчас в основном украинский)
+- Перевод REPORT.md на разные языки
+
+См. [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Не работает?
-
-Самые частые проблемы:
 
 | Симптом | Причина |
 |---|---|
@@ -127,3 +184,15 @@ PR welcome. Особенно интересно:
 | `Code 11` при импорте | Поле не активировано в Шаблоні даних. Включи: **Налаштування → Система → Каталог → Шаблон даних** |
 | Пустой HTML страницы | User-Agent блокируется. Скилл использует `Mozilla/5.0 (Horoshop SEO Audit)` — проверь не банится ли в robots/firewall |
 | `ModuleNotFoundError: No module named 'requests'` | `pip install --user requests beautifulsoup4 lxml` |
+
+Не помогло? Заводи [issue](https://github.com/IgorShutko/horoshop-claude-skill/issues/new/choose) или пиши в [TG](https://t.me/shutko_ads).
+
+---
+
+## Author
+
+**Игорь Шутко** — основатель [Target+](https://www.targetplus-agency.com/), performance-маркетинг для UA e-commerce.
+
+- 🌐 [targetplus-agency.com](https://www.targetplus-agency.com/)
+- 📺 TG [@shutko_ads](https://t.me/shutko_ads)
+- 💻 [@IgorShutko](https://github.com/IgorShutko)
