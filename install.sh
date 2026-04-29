@@ -6,7 +6,7 @@ set -e
 
 SKILL_NAME="horoshop-full-audit"
 TARGET_DIR="$HOME/.claude/skills/$SKILL_NAME"
-REPO="https://github.com/<YOUR_USERNAME>/horoshop-claude-skill.git"  # ← поменять на свой URL
+REPO="https://github.com/IgorShutko/horoshop-claude-skill.git"  # ← поменять на свой URL
 
 echo "→ Установка $SKILL_NAME..."
 

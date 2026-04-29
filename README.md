@@ -33,13 +33,13 @@
 ### Вариант 1 — одной командой (рекомендую)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<YOUR_USERNAME>/horoshop-claude-skill/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/IgorShutko/horoshop-claude-skill/main/install.sh | bash
 ```
 
 ### Вариант 2 — вручную
 
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/horoshop-claude-skill.git
+git clone https://github.com/IgorShutko/horoshop-claude-skill.git
 cd horoshop-claude-skill
 mkdir -p ~/.claude/skills/horoshop-full-audit
 cp -r SKILL.md scripts references evals ~/.claude/skills/horoshop-full-audit/
@@ -49,7 +49,7 @@ pip install --user requests beautifulsoup4 lxml
 
 ### Вариант 3 — `.skill` файл
 
-Скачай `horoshop-full-audit.skill` из [последнего релиза](https://github.com/<YOUR_USERNAME>/horoshop-claude-skill/releases) и дважды кликни — Claude Code установит автоматически.
+Скачай `horoshop-full-audit.skill` из [последнего релиза](https://github.com/IgorShutko/horoshop-claude-skill/releases) и дважды кликни — Claude Code установит автоматически.
 
 ## Использование
 
