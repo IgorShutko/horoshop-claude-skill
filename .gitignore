@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.DS_Store
+.env
+.venv/
+venv/
+
+# Артефакты аудита, если кто-то прогонит в этой папке
+catalog.json
+categories.json
+findings.json
+html_audit.json
+REPORT.md
+fix_*.json
+*_preview_*.json
+audit_*/
