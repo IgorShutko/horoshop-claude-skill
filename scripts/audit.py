@@ -335,6 +335,7 @@ def audit_products(products):
     titles = defaultdict(list)
     descs = defaultdict(list)
     slugs = defaultdict(list)
+    main_images = defaultdict(list)  # для проверки дублей главных картинок (item 10)
 
     char_keys_total = Counter()
     char_filled = Counter()
@@ -465,6 +466,15 @@ def audit_products(products):
             elif total_imgs == 1:
                 findings["single_image"].append({"article": article, "title": title})
 
+            # Дубли главных изображений между разными товарами (item 10)
+            first_img = None
+            if isinstance(imgs, list) and imgs:
+                first_img = imgs[0] if isinstance(imgs[0], str) else None
+            elif isinstance(gallery, list) and gallery:
+                first_img = gallery[0] if isinstance(gallery[0], str) else None
+            if first_img:
+                main_images[first_img].append(article)
+
             # GTIN/MPN
             if not (p.get("gtin") or "").strip():
                 findings["gtin_missing"].append({"article": article, "title": title})
@@ -562,6 +572,27 @@ def audit_products(products):
             if price in (0, "0", None, ""):
                 findings["price_zero"].append({"article": article, "title": title})
 
+            # Pricing checks — баги цен (item 9)
+            if price < 0:
+                findings["price_negative"].append({
+                    "article": article, "title": title, "price": price,
+                })
+            if price_old > 0 and price > price_old:
+                # Старая цена ниже текущей — зеркальная ситуация, потенциальный баг
+                findings["price_old_lower_than_price"].append({
+                    "article": article, "title": title,
+                    "price": price, "price_old": price_old,
+                })
+            if price_old > price > 0:
+                disc_pct = (price_old - price) / price_old * 100
+                if disc_pct > 80:
+                    # Скидка >80% — обычно баг ввода (например "99" вместо "9.9" или забытый ноль)
+                    findings["price_discount_too_high"].append({
+                        "article": article, "title": title,
+                        "price": price, "price_old": price_old,
+                        "real_discount": round(disc_pct, 1),
+                    })
+
             # Characteristics
             chars = p.get("characteristics") or {}
             if isinstance(chars, dict):
@@ -612,6 +643,9 @@ def audit_products(products):
     findings["dup_title"] = [{"value": k, "articles": v} for k, v in dup(titles).items()]
     findings["dup_description"] = [{"value": k[:120], "articles": v} for k, v in dup(descs).items()]
     findings["dup_slug"] = [{"value": k, "articles": v} for k, v in dup(slugs).items()]
+    findings["dup_main_image"] = [
+        {"image_url": k, "articles": v} for k, v in dup(main_images).items()
+    ]
 
     char_fill = {
         ch: {"filled": char_filled[ch], "total": char_total[ch]}

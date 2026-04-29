@@ -2,12 +2,13 @@
 
 > 🛠 Скилл для Claude Code, который делает полный SEO-аудит магазинов на платформе [Хорошоп](https://horoshop.ua/) через API + парсинг публичных страниц, формирует структурированный отчёт и применяет исправления через API после подтверждения.
 
-🌐 [🇷🇺 Русский](README.md) · [🇺🇦 Українська](README.uk.md)
+🌐 [🇷🇺 Русский](README.md) · [🇺🇦 Українська](README.uk.md) · [🇬🇧 English](README.en.md)
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-@shutko__ads-26A5E4?logo=telegram&logoColor=white)](https://t.me/shutko_ads)
-[![Agency](https://img.shields.io/badge/Made%20by-Target%2B%20Agency-FF4500)](https://www.targetplus-agency.com/)
+[![Agency](https://img.shields.io/badge/Made%20by-Target%2B%20Agency-FF4500)](https://www.targetplus-agency.com/?utm_source=github&utm_medium=readme&utm_campaign=horoshop-skill)
 [![Built for Claude Code](https://img.shields.io/badge/Built%20for-Claude%20Code-D97757)](https://claude.com/claude-code)
+[![Star History](https://img.shields.io/github/stars/IgorShutko/horoshop-claude-skill?style=social)](https://star-history.com/#IgorShutko/horoshop-claude-skill&Date)
 
 ---
 
