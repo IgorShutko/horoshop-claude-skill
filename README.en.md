@@ -2,7 +2,7 @@
 
 > 🛠 A Claude Code skill that runs a full SEO audit on stores built on the [Horoshop](https://horoshop.ua/) e-commerce platform via API + public-page parsing, generates a structured report, and applies fixes through the API after confirmation.
 
-🌐 [🇷🇺 Русский](README.md) · [🇺🇦 Українська](README.uk.md) · [🇬🇧 English](README.en.md)
+🌐 [Русский](README.md) · [Українська](README.uk.md) · [English](README.en.md)
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-@shutko__ads-26A5E4?logo=telegram&logoColor=white)](https://t.me/shutko_ads)

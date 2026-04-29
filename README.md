@@ -2,7 +2,7 @@
 
 > 🛠 Скилл для Claude Code, который делает полный SEO-аудит магазинов на платформе [Хорошоп](https://horoshop.ua/) через API + парсинг публичных страниц, формирует структурированный отчёт и применяет исправления через API после подтверждения.
 
-🌐 [🇷🇺 Русский](README.md) · [🇺🇦 Українська](README.uk.md) · [🇬🇧 English](README.en.md)
+🌐 [Русский](README.md) · [Українська](README.uk.md) · [English](README.en.md)
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-@shutko__ads-26A5E4?logo=telegram&logoColor=white)](https://t.me/shutko_ads)
