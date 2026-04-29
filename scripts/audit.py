@@ -424,7 +424,7 @@ def audit_products(products):
                 findings["seo_description_empty"].append({"article": article, "title": title})
             else:
                 seo_desc_lengths.append(len(seo_desc))
-                if len(seo_desc) > 170:
+                if len(seo_desc) > 160:
                     findings["seo_description_long"].append({"article": article, "len": len(seo_desc)})
                 if len(seo_desc) < 70:
                     findings["seo_description_short"].append({"article": article, "len": len(seo_desc)})

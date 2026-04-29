@@ -36,28 +36,35 @@ Content-Type: application/json
 | `mod_title.<lang>` | str | Название модификации (для дочерних товаров) |
 | `slug` | str | Только если `forceAliasUpdate: true` |
 | `display_in_showcase` | bool | Показывать на сайте |
-| `presence` | str | "В наявності" / "Немає" / "Очікується" |
+| `presence` | str (import) / dict (export) | При импорте — строка "в наличии" / "нет в наличии" / "ожидается" (или кастомный статус сайта). При экспорте возвращается объектом `{id, value: {ua, ru}}` |
 | `price`, `price_old`, `discount` | num | Цены |
 | `gtin`, `mpn` | str | Штрихкод и код производителя |
 | `popularity` | int | Популярность |
-| `icons[]` | str array | Стикеры по названию |
+| `icons[]` | str array | Стикеры по названию (имя должно совпадать с существующим в магазине; v4: можно проверить через `icons/export`) |
 | `images.links[]` | url array | Картинки модификации |
 | `gallery_common.links[]` | url array | Общие картинки |
-| `gallery_360.links[]` | url array | 360-обзор |
-| `parent.id` | int | ID основного раздела |
-| `alt_parent[]` | path/id array | Доп. разделы |
-| `accessories[]` | array | Аксессуары (по артикулу или категории) |
-| `gifts[]` | array | Подарки |
-| `characteristics.<key>` | dict | Характеристики (ключи кастомные у каждого магазина) |
-| `countdown_end_time` | datetime | "YYYY-MM-DD HH:MM:SS" — таймер акции |
+| `gallery_360.links[]` | url array | 360-обзор. Поддерживает `removeAll: true` (очищает галерею, остальные параметры игнорируются) |
+| `parent` | str (path) **или** `{id: int}` | ID или путь типа "Mac / iPhone 6" |
+| `alt_parent[]` | array | Каждый элемент — строка-путь или `{id: int}` |
+| `accessories[]` | array | Каждый элемент — строка-артикул, или `{article: ...}`, или `{page: "путь"}`, или `{page: {id: int}}` |
+| `gifts[]` | array | Аналогично `accessories` |
+| `characteristics.<key>` | dict | Характеристики. **Ключи кастомные у каждого магазина** — стандартные `material`, `country`, `gender` могут быть переименованы на украинский транслит (`materal`, `kranaVirobnik` и т.п.). Скилл смотрит реальные ключи через `catalog/export`. |
+| `countdown_end_time` | datetime | Формат `"YYYY-MM-DD HH:MM:SS"` или пустая строка для обнуления |
 | `countdown_description.<lang>` | str | Описание акции под таймером |
-| `installments_payment.id` | int | ПриватБанк: 1=выкл, 2=по умолч, 3+=N платежей |
-| `monobank_installments_payment.id` | int | Monobank: аналогично |
-| `unit_of_measurement.id` | int | Единица измерения |
-| `wholesale_prices[]` | array | Оптовые цены (B2B) |
-| `multiplicity`, `minimal_order` | int | Кратность и мин. заказ |
+| `marketplace_description.<lang>` | str | Отдельное описание для товарных фидов |
+| `currency` | str | Имя валюты (например `грн`, `USD`) — должно совпадать с переименованием в админке |
+| `popularity` | int | Популярность (для сортировки) |
+| `guarantee_shop`, `guarantee_length` | dict / int | Гарантия от магазина |
+| `installments_payment.id` 🆕 v4 | int | ПриватБанк: 1=выкл, 2=по умолч, 3+=N платежей |
+| `monobank_installments_payment.id` 🆕 v4 | int | Monobank: аналогично |
+| `unit_of_measurement.id` 🆕 v4 | int | Единица измерения |
+| `wholesale_prices[]` 🆕 v4 | array | Оптовые цены (B2B) |
+| `multiplicity`, `minimal_order` 🆕 v4 | int | Кратность и мин. заказ |
+| `delivery_time` 🆕 v4 | int | Срок доставки в днях (для фида Rozetka) |
 | `export_to_marketplace` | str (`;`-sep) | Маркетплейсы для выгрузки |
-| `condition.id` | int | Состояние (Новый/БУ) |
+| `condition.id` ⚠ | int | Состояние (Новый/БУ). Не описано явно в публичной API-доке — может потребовать активации в **Шаблоні даних** магазина. На некоторых магазинах вернёт код 11. |
+
+> 🆕 **v4** — поле появилось в Хорошоп 4.0. На магазинах v3 эти поля отсутствуют в шаблоне данных и API вернёт **код 11** (поле не найдено). Включается в **Налаштування → Система → Каталог → Шаблон даних**.
 
 ## Поля, которые НЕ редактируются через API
 
