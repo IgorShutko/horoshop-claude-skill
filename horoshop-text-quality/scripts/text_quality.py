@@ -189,6 +189,13 @@ CAPS_LOCK_RE = re.compile(r"\b[А-ЯЁІЇЄҐA-Z]{6,}\b")
 # 12. Дубли букв (в одном слове, например «оооочень»)
 LETTER_DUP_RE = re.compile(r"(\w)\1{3,}", re.IGNORECASE)
 
+# 13. HTML-entities в тексте — необработанные ампам-сущности
+HTML_ENTITY_RE = re.compile(r"&(?:nbsp|amp|quot|lt|gt|sup\d|times|sub\d|copy|trade|reg|deg|euro|pound|hellip|ldquo|rdquo|lsquo|rsquo|mdash|ndash|laquo|raquo|[a-z]{2,8}|#\d+);", re.IGNORECASE)
+
+# 14. Стена текста — длинное описание без структурных тегов
+NO_STRUCTURE_THRESHOLD = 500  # символов без HTML-разметки
+STRUCTURE_TAGS_RE = re.compile(r"<(p|br|h[1-6]|ul|ol|li|table|tr|td|div)\b", re.IGNORECASE)
+
 
 def split_sentences(text):
     """Грубое разделение на предложения."""
@@ -209,13 +216,44 @@ def _find_phrases(plain, phrases, limit=3):
     return found
 
 
-def check_text(text):
-    """Возвращает список проблем для одного текста."""
+def check_text(text, field_type="text"):
+    """Возвращает список проблем для одного текста.
+
+    field_type: 'description' / 'short_description' / 'marketplace_description' /
+                'title' / 'seo_title' / 'seo_description' / 'h1_title' / 'text'
+    """
     issues = []
     if not text:
         return issues
+    raw = text  # с HTML
     plain = strip_html(text).lower()
     plain_orig = strip_html(text)
+
+    # 0. HTML-entities в RAW тексте (не должны попадать в продакшен)
+    entities = HTML_ENTITY_RE.findall(raw)
+    # Также проверяем в plain_orig — после strip_html сущности тоже могут оставаться
+    entities_in_plain = HTML_ENTITY_RE.findall(plain_orig)
+    all_entities = entities + entities_in_plain
+    if all_entities:
+        # Уникальные, до 5
+        seen = set()
+        unique = []
+        for e in all_entities:
+            if e.lower() not in seen:
+                seen.add(e.lower())
+                unique.append(e)
+                if len(unique) >= 5:
+                    break
+        issues.append({"type": "html_entities_in_text", "examples": unique, "count": len(all_entities)})
+
+    # 0b. Стена текста (только для description) — длинный raw без структурных тегов
+    if field_type == "description" and len(plain_orig) > NO_STRUCTURE_THRESHOLD:
+        if not STRUCTURE_TAGS_RE.search(raw):
+            issues.append({
+                "type": "no_paragraphs",
+                "char_count": len(plain_orig),
+                "note": "опис >500 символів без <p>/<br>/<ul>/<table>",
+            })
 
     # 1. Throat-clearers (заглушки)
     if found := _find_phrases(plain, THROAT_CLEARERS):
@@ -289,6 +327,45 @@ def check_text(text):
     return issues
 
 
+def detect_template_phrases(products, lang, min_occurrences=5, min_phrase_len=30):
+    """Ищет фразы (>=30 символов), повторяющиеся у >=N товаров.
+
+    Это находит copy-paste шаблоны — одинаковые куски текста в карточках.
+    Возвращает список (phrase, count, example_articles).
+    """
+    from collections import Counter
+
+    main = [p for p in products if p.get("article") == p.get("parent_article")]
+    phrase_to_articles = defaultdict(list)
+
+    for p in main:
+        article = p.get("article", "")
+        for field in ("description", "short_description", "marketplace_description"):
+            text = strip_html(get_text(p.get(field), lang))
+            if not text or len(text) < min_phrase_len:
+                continue
+            # Разбиваем по предложениям (грубо)
+            for sent in re.split(r"[.!?\n]+", text):
+                sent = sent.strip()
+                if len(sent) >= min_phrase_len and len(sent) <= 200:
+                    phrase_to_articles[sent].append(article)
+
+    templates = []
+    for phrase, articles in phrase_to_articles.items():
+        # Уникальные товары (один товар может иметь фразу в нескольких полях)
+        unique_articles = list(set(articles))
+        if len(unique_articles) >= min_occurrences:
+            templates.append({
+                "phrase": phrase[:100] + ("..." if len(phrase) > 100 else ""),
+                "occurrences": len(unique_articles),
+                "articles_sample": unique_articles[:5],
+            })
+
+    # Сортируем: чем больше дублей, тем выше
+    templates.sort(key=lambda x: -x["occurrences"])
+    return templates[:10]  # топ-10
+
+
 def analyze(products, lang):
     findings = defaultdict(list)
     main = [p for p in products if p.get("article") == p.get("parent_article")]
@@ -311,7 +388,7 @@ def analyze(products, lang):
         for field_name, text in texts.items():
             if not text:
                 continue
-            field_issues = check_text(text)
+            field_issues = check_text(text, field_type=field_name)
             for issue in field_issues:
                 issue["field"] = field_name
                 product_issues.append(issue)
@@ -322,6 +399,11 @@ def analyze(products, lang):
                 "title": title,
                 "issues": product_issues,
             })
+
+    # Cross-product: template phrases (одна фраза у >=5 товаров)
+    templates = detect_template_phrases(products, lang)
+    if templates:
+        findings["template_phrases"] = templates
 
     return findings, len(main)
 
@@ -365,6 +447,19 @@ def generate_report(findings, total_main):
             md.append(f"| `{f}` | {c} |")
         md.append("")
 
+    # Шаблонні фрази (cross-product): одна фраза у багатьох товарах
+    templates = findings.get("template_phrases", [])
+    if templates:
+        md.append(f"## 🔁 Шаблонні фрази (copy-paste у {len(templates)} групах)\n")
+        md.append("Одна й та сама фраза в описах різних товарів — задушує унікальність контенту.\n")
+        md.append("| Фраза | Товарів | Приклади артикулів |")
+        md.append("|---|---|---|")
+        for t in templates:
+            phrase = t["phrase"].replace("|", "\\|")
+            arts = ", ".join(f"`{a}`" for a in t["articles_sample"])
+            md.append(f"| {phrase} | {t['occurrences']} | {arts} |")
+        md.append("")
+
     # Детали — топ-15 товаров с проблемами
     if products:
         md.append("## 🚨 Топ-15 товарів з найбільшою кількістю проблем\n")
@@ -376,6 +471,11 @@ def generate_report(findings, total_main):
                 f = iss["field"]
                 if t == "long_sentence":
                     md.append(f"- ⚠️ `{f}`: довге речення ({iss.get('count', 1)} шт). Приклад: «{iss.get('example', '')[:150]}...»")
+                elif t == "html_entities_in_text":
+                    examples = fmt_examples(iss.get("examples", []))
+                    md.append(f"- 🔴 `{f}` — **HTML-entities в тексті** ({iss.get('count', 0)} шт): {examples}")
+                elif t == "no_paragraphs":
+                    md.append(f"- ⚠️ `{f}` — **стіна тексту** ({iss.get('char_count', 0)} симв без `<p>`/`<br>`/`<ul>`)")
                 else:
                     examples = fmt_examples(iss.get("examples", []))
                     md.append(f"- ⚠️ `{f}` — **{t}**: {examples}")
@@ -413,6 +513,12 @@ def generate_report(findings, total_main):
     md.append("")
 
     md.append("\n## 💡 Що з цим робити\n")
+    if by_type.get("html_entities_in_text", 0) > 0:
+        md.append(f"- 🔴 **{by_type['html_entities_in_text']} текстів з HTML-entities** (`&nbsp;`, `&sup2;`, `&times;`) — це наслідок неправильної обробки HTML при імпорті. Прогнати через декодер: `html.unescape(text)` або заповнити карточки заново.")
+    if by_type.get("no_paragraphs", 0) > 0:
+        md.append(f"- ⚠️ **{by_type['no_paragraphs']} стін тексту** (description >500 симв без `<p>`/`<br>`/`<ul>`) — додати структурні теги. Краще читати, краще конвертить.")
+    if templates:
+        md.append(f"- 🔁 **{len(templates)} шаблонних фраз** повторюються в багатьох товарах — переписати унікально для кожної категорії або групи.")
     if by_type.get("throat_clearer", 0) > 0:
         md.append(f"- **{by_type['throat_clearer']} текстів зі словами-паразитами** («варто зазначити», «слід відмітити») — почати з суті")
     if by_type.get("ai_slop", 0) > 0:

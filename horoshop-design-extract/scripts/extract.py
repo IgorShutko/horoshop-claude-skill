@@ -7,6 +7,7 @@
 
 import argparse
 import json
+import os
 import re
 import sys
 from collections import Counter
@@ -34,6 +35,100 @@ def fetch(url, **kw):
         return r.status_code, r.text, r.content, r.url
     except Exception as e:
         return 0, str(e), b"", url
+
+
+def write_fail_report(url, reason_code, message, html_preview=""):
+    """Пишет понятный DESIGN_SYSTEM.md при провале — чтобы пользователь сразу видел что случилось."""
+    md = []
+    md.append(f"# Дизайн-система — НЕ ВДАЛОСЯ ВИТЯГТИ\n")
+    md.append(f"**URL:** {url}")
+    md.append(f"**Помилка:** `{reason_code}`")
+    md.append(f"**Опис:** {message}\n")
+
+    md.append("## Що це означає\n")
+    explanations = {
+        "http_error": "Сервер повернув не-200 статус. Перевір домен (опечатка?), доступність сайту.",
+        "html_too_short": "Сторінка повернула менше 1 КБ HTML. Це або заглушка анти-бота, або сайт лежить.",
+        "cloudflare_waf": "Cloudflare блокує запити з простого Python-клієнта. Потрібен браузерний рендеринг.",
+        "no_css_no_logo": "HTML отриманий, але без CSS-посилань і логотипа. Контент рендериться через JS (SPA-стиль) або лендінг-конструктор не використовує зовнішні стилі.",
+        "playwright_failed": "Headless Chromium не зміг рендернути сторінку. Перевір що Playwright встановлений: `pip install playwright && playwright install chromium`.",
+    }
+    md.append(explanations.get(reason_code, "Невідома причина."))
+    md.append("")
+
+    md.append("## Як виправити\n")
+    if reason_code in ("html_too_short", "no_css_no_logo", "cloudflare_waf"):
+        md.append("Запусти з headless-браузером:\n")
+        md.append("```bash")
+        md.append("pip install playwright")
+        md.append("playwright install chromium")
+        md.append(f"PLAYWRIGHT=1 python3 extract.py --url {url}")
+        md.append("```\n")
+        md.append("Або зібрати дизайн-систему вручну:")
+        md.append("- Зайти на сайт у звичайному браузері")
+        md.append("- Через DevTools → Network → відфільтрувати CSS — побачиш реальні стилі")
+        md.append("- Логотип — Inspect Element на лого в шапці")
+    elif reason_code == "playwright_failed":
+        md.append("Перевстанови Playwright:")
+        md.append("```bash")
+        md.append("pip install --upgrade playwright")
+        md.append("playwright install chromium")
+        md.append("```")
+    else:
+        md.append("Перевір домен та доступність сайту. Якщо все ОК — відкрий issue в репо скілла.")
+    md.append("")
+
+    if html_preview:
+        md.append("## Перші 500 символів отриманого HTML (для діагностики)\n")
+        md.append("```html")
+        md.append(html_preview[:500])
+        md.append("```\n")
+
+    md.append("---\n")
+    md.append("🎨 *Згенеровано скілом [horoshop-design-extract](https://github.com/IgorShutko/horoshop-claude-skill) — Target+ Agency.*")
+
+    Path("DESIGN_SYSTEM.md").write_text("\n".join(md), encoding="utf-8")
+    Path("design.json").write_text(json.dumps({
+        "domain": urlparse(url).netloc,
+        "url": url,
+        "extracted": False,
+        "fail_reason": reason_code,
+        "fail_message": message,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"  → DESIGN_SYSTEM.md з описом помилки записаний")
+
+
+def fetch_via_playwright(url):
+    """Опциональный fallback на Playwright для JS-rendered сайтов.
+
+    Активируется через `PLAYWRIGHT=1` env-переменную.
+    Требует: pip install playwright + playwright install chromium
+
+    Возвращает (status_code, rendered_html, content_bytes, final_url).
+    Если Playwright не установлен — возвращает (0, ...) с фейлом.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return 0, ("Playwright не встановлений. Поставь: "
+                   "pip install playwright && playwright install chromium"), b"", url
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                           "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+                locale="uk-UA",
+            )
+            page = context.new_page()
+            page.goto(url, wait_until="networkidle", timeout=60_000)
+            html = page.content()
+            final_url = page.url
+            browser.close()
+        return 200, html, html.encode("utf-8"), final_url
+    except Exception as e:
+        return 0, f"Playwright помилка: {e}", b"", url
 
 
 # ─── Извлечение из CSS ─────────────────────────────────────────────────────
@@ -172,30 +267,42 @@ def main():
     url = args.url.rstrip("/") + "/"
     print(f"=== Design extract {url} ===\n")
 
-    # 1. Главная
-    print("[1/4] Загружаю главную...")
-    sc, html, _, final = fetch(url)
-    if sc != 200:
-        print(f"ERROR: статус {sc} — головна не доступна", file=sys.stderr)
-        sys.exit(1)
+    use_playwright = os.environ.get("PLAYWRIGHT") == "1"
+    if use_playwright:
+        print("  PLAYWRIGHT=1 → використовую headless Chromium")
+        print("[1/4] Завантажую главну (Playwright)...")
+        sc, html, _, final = fetch_via_playwright(url)
+        if sc != 200:
+            print(f"  ❌ Playwright fail: {html[:200]}", file=sys.stderr)
+            write_fail_report(url, "playwright_failed", html[:500])
+            sys.exit(2)
+    else:
+        print("[1/4] Завантажую главну (requests)...")
+        sc, html, _, final = fetch(url)
+        if sc != 200:
+            print(f"ERROR: статус {sc} — головна не доступна", file=sys.stderr)
+            write_fail_report(url, "http_error", f"HTTP {sc}: {html[:200]}")
+            sys.exit(1)
 
     # Sanity-check: HTML должен быть осмысленного размера
     html_len = len(html)
     print(f"  HTML розмір: {html_len} байт")
     if html_len < 1000:
-        print(f"\n❌ ERROR: HTML занадто короткий ({html_len} байт).", file=sys.stderr)
-        print("   Можливі причини:", file=sys.stderr)
-        print("     • JS-rendered SPA (контент рендериться браузером)", file=sys.stderr)
-        print("     • Cloudflare/WAF challenge (треба JS-капча)", file=sys.stderr)
-        print("     • Сайт лежить", file=sys.stderr)
-        print("\n   Workaround: спробуй інший User-Agent або headless browser (Playwright).", file=sys.stderr)
+        msg = f"HTML занадто короткий ({html_len} байт). Можливо: JS-SPA / WAF / сайт лежить."
+        print(f"\n❌ ERROR: {msg}", file=sys.stderr)
+        if not use_playwright:
+            print("   Спробуй з Playwright: PLAYWRIGHT=1 python3 extract.py --url ...", file=sys.stderr)
+        write_fail_report(url, "html_too_short", msg, html_preview=html)
         sys.exit(2)
 
     # Детект Cloudflare challenge
     lower_html = html[:5000].lower()
     if "cloudflare" in lower_html and ("challenge" in lower_html or "checking your browser" in lower_html):
-        print(f"\n❌ ERROR: Cloudflare challenge виявлено. Сайт за WAF.", file=sys.stderr)
-        print("   Workaround: headless browser (Playwright) або cloudscraper.", file=sys.stderr)
+        msg = "Cloudflare challenge виявлено. Сайт за WAF."
+        print(f"\n❌ ERROR: {msg}", file=sys.stderr)
+        if not use_playwright:
+            print("   Workaround: PLAYWRIGHT=1 python3 extract.py --url ...", file=sys.stderr)
+        write_fail_report(url, "cloudflare_waf", msg, html_preview=html[:500])
         sys.exit(2)
 
     # 2. HTML парсинг
@@ -204,13 +311,12 @@ def main():
 
     # Sanity: должен быть хотя бы какой-то <head> / <body>
     if not info["css_files"] and not info["inline_styles"] and not info["logo_url"] and not info["favicon_url"]:
-        print(f"\n❌ ERROR: HTML отриманий, але в ньому немає ані CSS, ані лого, ані favicon.", file=sys.stderr)
-        print("   Це означає що:", file=sys.stderr)
-        print("     • Контент завантажується через JS (SPA)", file=sys.stderr)
-        print("     • Сайт використовує лендінг-конструктор без зовнішніх стилів", file=sys.stderr)
-        print("     • HTML — це fallback-заглушка (анти-бот)", file=sys.stderr)
-        print(f"\n   Перші 500 символів HTML для діагностики:", file=sys.stderr)
-        print(f"   {html[:500]!r}", file=sys.stderr)
+        msg = ("HTML отриманий, але в ньому немає ані CSS, ані лого, ані favicon. "
+               "Скоріше за все JS-SPA або лендінг-конструктор без зовнішніх стилів.")
+        print(f"\n❌ ERROR: {msg}", file=sys.stderr)
+        if not use_playwright:
+            print("   Спробуй: PLAYWRIGHT=1 python3 extract.py --url ...", file=sys.stderr)
+        write_fail_report(url, "no_css_no_logo", msg, html_preview=html[:1000])
         sys.exit(3)
 
     # 3. CSS — соединяем inline + первые N внешних

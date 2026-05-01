@@ -167,29 +167,43 @@ def get_top_level_value(p, key):
     return val.strip().lower() if val and val.strip() else None
 
 
+# Шаблонные плейсхолдеры (lorem ipsum, tbd, заполнить позже и т.д.)
+PLACEHOLDER_PHRASES = [
+    "lorem ipsum", "lorem ip", "dolor sit", "todo", "tbd", "tba",
+    "заполнить", "заполнить позже", "опис буде",
+    "test test", "тест тест", "xxxxxx", "######",
+    "placeholder", "заглушка",
+]
+
+
 def analyze(products):
     findings = defaultdict(list)
     main = [p for p in products if p.get("article") == p.get("parent_article")]
+    all_products = products  # для проверки модификаций
 
+    # Группируем модификации по родительскому артикулу
+    by_parent = defaultdict(list)
+    for p in all_products:
+        parent = p.get("parent_article")
+        if parent:
+            by_parent[parent].append(p)
+
+    # ── 1-4: text-vs-characteristics для каждого главного товара ──────────
     for p in main:
         article = p.get("article", "")
         title = get_text(p.get("title"))
         description = strip_html(get_text(p.get("description")))
         short_desc = strip_html(get_text(p.get("short_description")))
 
-        # Текст для проверки = title + description + short_description
         full_text = " ".join([title, description, short_desc])
 
         # 1. Материал
         mat_in_text = detect_in_text(full_text, MATERIALS)
-        # Стандартные ключи characteristics для материала
         mat_in_chars = get_char_value(p, ["material", "materal", "matarial"])
         if mat_in_chars:
             mat_in_chars_set = detect_in_text(mat_in_chars, MATERIALS)
-            # Если в тексте упомянуты материалы которых нет в characteristics
             extra_in_text = mat_in_text - mat_in_chars_set
             if extra_in_text and mat_in_chars_set and extra_in_text != mat_in_text:
-                # Конфликт: текст и характеристики ссылаются на разные материалы
                 findings["material_conflict"].append({
                     "article": article, "title": title,
                     "in_text": list(mat_in_text),
@@ -210,9 +224,8 @@ def analyze(products):
                     "char_value": country_in_chars,
                 })
 
-        # 3. Цвет (color — top-level поле в Horoshop API, не в characteristics)
+        # 3. Цвет (color — top-level поле, не в characteristics)
         color_in_title_set = detect_in_text(title, COLORS)
-        # Сначала смотрим top-level color, потом — characteristics (на случай кастомных шаблонов)
         color_value = get_top_level_value(p, "color") or get_char_value(p, ["color", "kolr", "colour"])
         if color_value:
             color_in_chars_set = detect_in_text(color_value, COLORS)
@@ -224,12 +237,11 @@ def analyze(products):
                     "char_value": color_value,
                 })
 
-        # 4. Размеры (грубо: ловим NNxNN или NN×NN в title и описании, сравниваем)
+        # 4. Размеры NNxNN
         size_pattern = re.compile(r"\b(\d{2,4})\s*[×x]\s*(\d{2,4})\b")
         title_sizes = set(size_pattern.findall(title))
         desc_sizes = set(size_pattern.findall(description))
         if title_sizes and desc_sizes:
-            # Если в title и description полностью разные размеры — конфликт
             if not (title_sizes & desc_sizes):
                 findings["size_conflict"].append({
                     "article": article, "title": title,
@@ -237,7 +249,113 @@ def analyze(products):
                     "in_description": list(desc_sizes)[:3],
                 })
 
+        # ── 5: discount vs price math ─────────────────────────────────────
+        try:
+            price = float(p.get("price") or 0)
+            price_old = float(p.get("price_old") or 0)
+            discount_field = p.get("discount")
+            if discount_field is None:
+                discount = 0
+            else:
+                # discount может быть {"id": N, "value": ...} или просто числом
+                if isinstance(discount_field, dict):
+                    discount = float(discount_field.get("value", 0) or 0)
+                else:
+                    discount = float(discount_field or 0)
+
+            if price_old > price > 0 and discount > 0:
+                actual_pct = (price_old - price) / price_old * 100
+                if abs(actual_pct - discount) > 5:  # допуск ±5%
+                    findings["discount_math_mismatch"].append({
+                        "article": article, "title": title,
+                        "price": price, "price_old": price_old,
+                        "stated_discount": discount,
+                        "actual_discount": round(actual_pct, 1),
+                    })
+        except (TypeError, ValueError):
+            pass
+
+        # ── 6: плейсхолдеры в текстах ────────────────────────────────────
+        text_to_check = (title + " " + description + " " + short_desc).lower()
+        found_placeholders = [ph for ph in PLACEHOLDER_PHRASES if ph in text_to_check]
+        if found_placeholders:
+            findings["placeholder_text"].append({
+                "article": article, "title": title,
+                "found": found_placeholders[:3],
+            })
+
+        # ── 7: модификации с разной материал/странной от родителя ─────────
+        mods = by_parent.get(article, [])
+        if len(mods) > 1:
+            parent_mat = get_char_value(p, ["material", "materal", "matarial"])
+            parent_country = get_char_value(p, ["country", "kranaVirobnik", "manufacturerCountry"])
+            mod_mats = set()
+            mod_countries = set()
+            for mod in mods:
+                if mod.get("article") == article:
+                    continue  # сам себя не считаем
+                mm = get_char_value(mod, ["material", "materal", "matarial"])
+                mc = get_char_value(mod, ["country", "kranaVirobnik", "manufacturerCountry"])
+                if mm:
+                    mod_mats.add(mm)
+                if mc:
+                    mod_countries.add(mc)
+
+            mat_drift = parent_mat and mod_mats and not all(m == parent_mat for m in mod_mats)
+            country_drift = parent_country and mod_countries and not all(c == parent_country for c in mod_countries)
+            if mat_drift or country_drift:
+                findings["mod_attribute_drift"].append({
+                    "article": article, "title": title,
+                    "parent_material": parent_mat,
+                    "mod_materials": list(mod_mats) if mat_drift else None,
+                    "parent_country": parent_country,
+                    "mod_countries": list(mod_countries) if country_drift else None,
+                })
+
+    # ── 8: negative price / negative stock (применим ко всем, не только main) ──
+    for p in all_products:
+        article = p.get("article", "")
+        title = get_text(p.get("title"))
+        try:
+            price = float(p.get("price") or 0)
+            if price < 0:
+                findings["negative_price"].append({
+                    "article": article, "title": title, "price": price,
+                })
+        except (TypeError, ValueError):
+            pass
+
+        # negative residues (если есть учет складов)
+        residues = p.get("residues") or []
+        if isinstance(residues, list):
+            for r in residues:
+                if isinstance(r, dict):
+                    try:
+                        qty = int(r.get("quantity", 0) or 0)
+                        if qty < 0:
+                            findings["negative_stock"].append({
+                                "article": article, "title": title,
+                                "warehouse": r.get("warehouse"), "quantity": qty,
+                            })
+                            break
+                    except (TypeError, ValueError):
+                        pass
+
     return findings, len(main)
+
+
+# Список всех проверок для документации в отчёте
+ALL_CHECKS = [
+    ("material_conflict", "Матеріал у тексті ≠ characteristics.material"),
+    ("country_conflict", "Країна у тексті ≠ characteristics.country"),
+    ("color_conflict", "Колір в title ≠ полю color"),
+    ("size_conflict", "Розмір в title ≠ розміру в description"),
+    ("discount_math_mismatch", "Заявлена discount ≠ (price_old - price) / price_old"),
+    ("placeholder_text", "Плейсхолдери в тексті (lorem ipsum, todo, тест тест...)"),
+    ("mod_attribute_drift", "Модифікації одного товару мають різні material/country"),
+    ("negative_price", "Ціна < 0 (баг імпорту)"),
+    ("negative_stock", "Залишок на складі < 0 (баг обліку)"),
+]
 
 
 def generate_report(findings, total_main):
@@ -247,40 +365,116 @@ def generate_report(findings, total_main):
 
     n = lambda k: len(findings.get(k, []))
 
-    if not any(findings.get(k) for k in ("material_conflict", "country_conflict", "color_conflict", "size_conflict")):
-        md.append("Конфліктів не знайдено. ✅\n")
-    else:
-        md.append("## 📋 Знахідки\n")
-        md.append("| Тип конфлікту | Кількість |")
-        md.append("|---|---|")
-        if n("material_conflict"): md.append(f"| Матеріал у тексті ≠ характеристикам | {n('material_conflict')} |")
-        if n("country_conflict"): md.append(f"| Країна у тексті ≠ характеристикам | {n('country_conflict')} |")
-        if n("color_conflict"): md.append(f"| Колір в title ≠ характеристикам | {n('color_conflict')} |")
-        if n("size_conflict"): md.append(f"| Розмір в title ≠ опису | {n('size_conflict')} |")
-        md.append("")
+    # Список того, что проверялось — чтобы пользователь видел масштаб даже при 0 конфликтов
+    md.append("## 🔬 Що перевіряється\n")
+    md.append("| # | Перевірка | Знайдено |")
+    md.append("|---|---|---|")
+    for i, (key, desc) in enumerate(ALL_CHECKS, 1):
+        cnt = n(key)
+        marker = "🟢" if cnt == 0 else ("🟡" if cnt < 5 else "🔴")
+        md.append(f"| {i} | {desc} | {marker} {cnt} |")
+    md.append("")
 
-        for typ, label in (
-            ("material_conflict", "🧵 Конфлікт матеріалу"),
-            ("country_conflict", "🌍 Конфлікт країни"),
-            ("color_conflict", "🎨 Конфлікт кольору"),
-            ("size_conflict", "📏 Конфлікт розміру"),
-        ):
+    total_conflicts = sum(n(k) for k, _ in ALL_CHECKS)
+    if total_conflicts == 0:
+        md.append(f"## ✅ Конфліктів не знайдено\n")
+        md.append(f"Перевірено **{len(ALL_CHECKS)} типів конфліктів** на **{total_main} головних товарах**. Всі узгоджено.\n")
+    else:
+        md.append(f"## 📋 Знахідки ({total_conflicts} всього)\n")
+
+        # Детали по каждому типу
+        type_labels = {
+            "material_conflict": "🧵 Конфлікт матеріалу",
+            "country_conflict": "🌍 Конфлікт країни",
+            "color_conflict": "🎨 Конфлікт кольору",
+            "size_conflict": "📏 Конфлікт розміру",
+            "discount_math_mismatch": "💸 Заявлена знижка ≠ реальній",
+            "placeholder_text": "📝 Плейсхолдери в тексті",
+            "mod_attribute_drift": "🔀 Дрифт атрибутів модифікацій",
+            "negative_price": "💰 Від'ємна ціна",
+            "negative_stock": "📦 Від'ємний залишок",
+        }
+
+        # Текстовые конфликты
+        for typ in ("material_conflict", "country_conflict", "color_conflict", "size_conflict"):
             items = findings.get(typ, [])
             if not items:
                 continue
-            md.append(f"## {label}\n")
+            md.append(f"### {type_labels[typ]} ({len(items)})\n")
             md.append("| Артикул | Назва | У тексті | У характеристиках |")
             md.append("|---|---|---|---|")
             for it in items[:15]:
                 in_text = ", ".join(it.get("in_text", it.get("in_title", []))[:2])
-                in_chars = ", ".join(it.get("in_characteristics", [])[:2]) or it.get("char_value", "—")[:30]
+                in_chars = ", ".join(it.get("in_characteristics", [])[:2]) or str(it.get("char_value", "—"))[:30]
                 md.append(f"| `{it['article']}` | {it['title'][:50]} | {in_text} | {in_chars} |")
+            md.append("")
+
+        # Discount math
+        items = findings.get("discount_math_mismatch", [])
+        if items:
+            md.append(f"### {type_labels['discount_math_mismatch']} ({len(items)})\n")
+            md.append("| Артикул | Назва | Ціна | Стара ціна | Заявлено discount | Реальна discount |")
+            md.append("|---|---|---|---|---|---|")
+            for it in items[:15]:
+                md.append(f"| `{it['article']}` | {it['title'][:40]} | {it['price']} | {it['price_old']} | {it['stated_discount']}% | {it['actual_discount']}% |")
+            md.append("")
+
+        # Placeholders
+        items = findings.get("placeholder_text", [])
+        if items:
+            md.append(f"### {type_labels['placeholder_text']} ({len(items)})\n")
+            md.append("| Артикул | Назва | Знайдено |")
+            md.append("|---|---|---|")
+            for it in items[:15]:
+                md.append(f"| `{it['article']}` | {it['title'][:50]} | {', '.join(it['found'])} |")
+            md.append("")
+
+        # Mod drift
+        items = findings.get("mod_attribute_drift", [])
+        if items:
+            md.append(f"### {type_labels['mod_attribute_drift']} ({len(items)})\n")
+            md.append("Модифікації одного товару мають різні значення material/country — або родитель і модифікації різні. "
+                     "Це підозріло (зазвичай вони мають один материал).\n")
+            md.append("| Артикул | У родителя | В модифікаціях |")
+            md.append("|---|---|---|")
+            for it in items[:10]:
+                parts = []
+                if it.get("mod_materials"):
+                    parts.append(f"material: {it.get('parent_material', '—')} vs {it['mod_materials']}")
+                if it.get("mod_countries"):
+                    parts.append(f"country: {it.get('parent_country', '—')} vs {it['mod_countries']}")
+                md.append(f"| `{it['article']}` | див. деталі | {' / '.join(parts)} |")
+            md.append("")
+
+        # Negatives
+        items = findings.get("negative_price", [])
+        if items:
+            md.append(f"### {type_labels['negative_price']} ({len(items)})\n")
+            md.append("| Артикул | Назва | Ціна |")
+            md.append("|---|---|---|")
+            for it in items[:10]:
+                md.append(f"| `{it['article']}` | {it['title'][:50]} | {it['price']} |")
+            md.append("")
+
+        items = findings.get("negative_stock", [])
+        if items:
+            md.append(f"### {type_labels['negative_stock']} ({len(items)})\n")
+            md.append("| Артикул | Назва | Склад | Залишок |")
+            md.append("|---|---|---|---|")
+            for it in items[:10]:
+                md.append(f"| `{it['article']}` | {it['title'][:40]} | {it['warehouse']} | {it['quantity']} |")
             md.append("")
 
         md.append("## 💡 Що з цим робити\n")
         md.append("- Для кожного конфлікту: **руками** перевірити, що правильне — текст чи характеристики")
         md.append("- Часто проблема в тому що при копіюванні товара забули поміняти")
         md.append("- Якщо проблема системна (багато конфліктів) — перевірити CSV-імпорт або процес заведення товарів")
+        if findings.get("discount_math_mismatch"):
+            md.append("- Discount math: або перерахувати `discount` через `(price_old - price) / price_old * 100`, або виправити ціни")
+        if findings.get("placeholder_text"):
+            md.append("- Плейсхолдери: знайти й переписати реальним описом (lorem ipsum / todo / тест — це безсумнівно баг)")
+        if findings.get("negative_price") or findings.get("negative_stock"):
+            md.append("- Від'ємні цифри: терміново перевірити імпорт. На сайт такі товари показуватись не повинні.")
 
     md.append("\n---\n")
     md.append("🔍 *Згенеровано скілом [horoshop-consistency](https://github.com/IgorShutko/horoshop-claude-skill) — Target+ Agency.*")

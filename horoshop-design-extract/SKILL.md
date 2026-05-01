@@ -50,6 +50,18 @@ python3 ${SKILL_DIR}/scripts/extract.py --url https://example.com.ua
 - `--max-css 5` — максимум CSS файлов скачивать (default 5)
 - `--no-download` — не скачивать ассеты, только URL'ы
 
+Env-переменные:
+- `PLAYWRIGHT=1` — fallback на headless Chromium для JS-rendered SPA / Cloudflare-сайтов. Требует: `pip install playwright && playwright install chromium` (~250МБ).
+
+## Поведение при провале
+
+Если страница не отдала контент (SPA / WAF / лендинг без CSS) — скрипт:
+1. Возвращает exit code 2 или 3 (не 0)
+2. Пишет в `DESIGN_SYSTEM.md` понятное сообщение с диагнозом и инструкцией как починить (через `PLAYWRIGHT=1` или вручную через DevTools)
+3. Пишет в `design.json` структуру `{"extracted": false, "fail_reason": "...", "fail_message": "..."}`
+
+Это позволяет `horoshop-suite` детектить «partial»-результаты и выводить их пользователю.
+
 ## Output
 
 - `design.json` — структурированная дизайн-система

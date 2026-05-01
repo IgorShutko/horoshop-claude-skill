@@ -66,6 +66,79 @@ def run_skill(name, args, env, log_path):
         return False, f"error: {e}"
 
 
+def validate_artifact(skill_name):
+    """Проверяет качество артефакта скилла. Возвращает (status, reason).
+
+    status: 'ok' / 'partial' / 'missing'
+    """
+    artifact_map = {
+        "audit": ("REPORT.md", _validate_audit_report),
+        "sales": ("SALES_REPORT.md", _validate_md_with_sections),
+        "gaps": ("gaps.json", _validate_gaps_json),
+        "photo": ("PHOTO_REPORT.md", _validate_md_with_sections),
+        "text": ("TEXT_QUALITY_REPORT.md", _validate_md_with_sections),
+        "consistency": ("CONSISTENCY_REPORT.md", _validate_md_with_sections),
+        "design": ("DESIGN_SYSTEM.md", _validate_design_md),
+    }
+
+    if skill_name not in artifact_map:
+        return "ok", "unknown skill"
+
+    fpath, validator = artifact_map[skill_name]
+    if not Path(fpath).exists():
+        return "missing", f"{fpath} не створений"
+
+    return validator(fpath)
+
+
+def _validate_audit_report(fpath):
+    """REPORT.md — должен иметь >= 5 секций (## ...)."""
+    txt = Path(fpath).read_text(encoding="utf-8")
+    sections = re.findall(r"^## ", txt, re.MULTILINE)
+    if len(sections) < 5:
+        return "partial", f"тільки {len(sections)} секцій (< 5)"
+    return "ok", f"{len(sections)} секцій"
+
+
+def _validate_md_with_sections(fpath):
+    """Любой *_REPORT.md — должна быть хоть одна секция и > 200 байт."""
+    txt = Path(fpath).read_text(encoding="utf-8")
+    if len(txt) < 200:
+        return "partial", f"звіт занадто короткий ({len(txt)} байт)"
+    sections = re.findall(r"^## ", txt, re.MULTILINE)
+    if len(sections) < 1:
+        return "partial", "немає секцій ##"
+    return "ok", f"{len(sections)} секцій"
+
+
+def _validate_gaps_json(fpath):
+    """gaps.json — пустой [] валиден (=нет gaps). Главное — JSON парсится."""
+    try:
+        data = json.loads(Path(fpath).read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            return "ok", f"{len(data)} gaps"
+        return "partial", "не-список JSON"
+    except Exception as e:
+        return "partial", f"невалідний JSON: {e}"
+
+
+def _validate_design_md(fpath):
+    """DESIGN_SYSTEM.md — главное: НЕТ маркера 'НЕ ВДАЛОСЯ ВИТЯГТИ'."""
+    txt = Path(fpath).read_text(encoding="utf-8")
+    if "НЕ ВДАЛОСЯ ВИТЯГТИ" in txt or "extracted: false" in txt.lower():
+        return "partial", "extract провалився, потрібен PLAYWRIGHT=1"
+    # Должно быть хоть что-то из {логотип, цвета, шрифты}
+    has_logo = "Логотип:" in txt and "Логотип: `—`" not in txt
+    has_colors = "## 🎨 Топ-15 цветов" in txt or "Цветов уникальных: 0" not in txt
+    has_fonts = "## 🔤 Шрифты" in txt
+    score = sum([has_logo, has_colors, has_fonts])
+    if score == 0:
+        return "partial", "ні лого, ні кольорів, ні шрифтів"
+    if score < 2:
+        return "partial", f"тільки {score}/3 артефактів"
+    return "ok", f"{score}/3 артефактів"
+
+
 def read_safe(path, max_lines=None):
     if not Path(path).exists():
         return ""
@@ -208,8 +281,8 @@ def generate_suite_report(domain, completed_skills, args):
 
     # ── Статус виконання ─────────────────────────────────────────
     md.append("## 📦 Статус скілів\n")
-    md.append("| Скіл | Останній запуск | Артефакт |")
-    md.append("|---|---|---|")
+    md.append("| Скіл | Останній запуск | Якість артефакту | Файл |")
+    md.append("|---|---|---|---|")
     for name, full_skill_data in SKILLS.items():
         skill_full = full_skill_data[0]
         report = SKILL_REPORT_FILES.get(name, "—")
@@ -219,14 +292,29 @@ def generate_suite_report(domain, completed_skills, args):
         # Статус: если в текущем запуске — берём оттуда. Иначе — «з попереднього запуску» если артефакт есть.
         if name in completed_skills:
             ok, status = completed_skills[name]
-            marker = "✅" if ok else "❌"
-            run_status = f"{marker} {status} (зараз)"
+            if "partial" in status or "missing" in status:
+                run_marker = "⚠️"
+            else:
+                run_marker = "✅" if ok else "❌"
+            run_status = f"{run_marker} {status} (зараз)"
         elif report_exists:
             run_status = "💾 з попереднього запуску"
         else:
             run_status = "— не запускався"
 
-        md.append(f"| `{skill_full}` | {run_status} | {report_link} |")
+        # Качество артефакта на диске (актуальное состояние)
+        if report_exists:
+            art_status, art_reason = validate_artifact(name)
+            if art_status == "ok":
+                art_quality = f"✅ {art_reason}"
+            elif art_status == "partial":
+                art_quality = f"⚠️ {art_reason}"
+            else:
+                art_quality = f"❌ {art_reason}"
+        else:
+            art_quality = "—"
+
+        md.append(f"| `{skill_full}` | {run_status} | {art_quality} | {report_link} |")
     md.append("")
 
     # ── Брендовый футер ───────────────────────────────────────────
@@ -367,6 +455,19 @@ def main():
             ok, status = run_skill(name, ["--url", site_url], env, log_path)
         else:
             ok, status = False, "unknown"
+
+        # Валидация артефакта (даже если returncode == 0, артефакт может быть пустой)
+        if ok:
+            artifact_status, artifact_reason = validate_artifact(name)
+            if artifact_status == "partial":
+                ok = False  # формально не fail, но в SUITE_REPORT отразится
+                status = f"partial: {artifact_reason}"
+                print(f"    ⚠️ {name} (artifact) {artifact_reason}")
+            elif artifact_status == "missing":
+                ok = False
+                status = f"missing: {artifact_reason}"
+                print(f"    ✗ {name} (artifact) {artifact_reason}")
+
         completed[name] = (ok, status)
 
     print("\n[+] Формирование SUITE_REPORT.md...")
@@ -391,15 +492,28 @@ def main():
     Path("suite_status.json").write_text(json.dumps(suite_status, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"\n━━━ TL;DR ━━━")
-    ok_count = sum(1 for v in completed.values() if v[0])
-    print(f"  Запущено: {ok_count} / {len(completed)} скіллов")
+    ok_list, partial_list, failed_list = [], [], []
     for name, (ok, status) in completed.items():
-        marker = "✓" if ok else "✗"
+        if ok:
+            ok_list.append(name)
+        elif "partial" in status:
+            partial_list.append(name)
+        else:
+            failed_list.append(name)
+
+    print(f"  ✅ ОК: {len(ok_list)} · ⚠️  Partial: {len(partial_list)} · ❌ Fail: {len(failed_list)} (з {len(completed)})\n")
+    for name, (ok, status) in completed.items():
+        if ok:
+            marker = "✅"
+        elif "partial" in status:
+            marker = "⚠️"
+        else:
+            marker = "❌"
         print(f"  {marker} {SKILLS[name][0]:30s} {status}")
     print(f"\nГолова: SUITE_REPORT.md  ·  суддя: suite_status.json")
 
-    # Exit code: 0 если все ок, 1 если хотя бы один зафейлил
-    sys.exit(0 if ok_count == len(completed) else 1)
+    # Exit code: 0 если все ок (без partial), 1 если хотя бы partial/fail
+    sys.exit(0 if (len(partial_list) == 0 and len(failed_list) == 0) else 1)
 
 
 if __name__ == "__main__":

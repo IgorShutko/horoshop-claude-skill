@@ -234,7 +234,13 @@ def parse_seo(html):
     return info
 
 
-def html_audit(products):
+def html_audit(products, sample_size=None):
+    """Парсит публичные страницы магазина.
+
+    sample_size:
+        None  — все товары (по умолчанию)
+        int N — случайная выборка из N товаров (для больших каталогов)
+    """
     print("[2/4] HTML-парсинг публічних сторінок...")
     base = f"https://{DOMAIN}"
 
@@ -270,17 +276,27 @@ def html_audit(products):
             pages_data.append({"url": url, "status": sc, "error": True})
         print(f"  [{i+1}/{len(pages_urls)}] {url.replace(base, '')}", end="\r", flush=True)
 
-    # Сэмпл товаров — 10 случайных из каталога
-    import random
-    random.seed(42)
-    sample = random.sample(catalog_urls, min(10, len(catalog_urls))) if catalog_urls else []
+    # Товары — по умолчанию ВСЕ из каталог-sitemap. Для больших каталогов:
+    # передай sample_size=N (случайная выборка с фиксированным seed).
+    if sample_size and sample_size < len(catalog_urls):
+        import random
+        random.seed(42)
+        targets = random.sample(catalog_urls, sample_size)
+        print(f"       товарів у sitemap: {len(catalog_urls)}, парсимо вибірку: {sample_size}")
+    else:
+        targets = catalog_urls
+        if catalog_urls:
+            print(f"       товарів у sitemap: {len(catalog_urls)}, парсимо всі")
+
     products_data = []
-    for url in sample:
+    for i, url in enumerate(targets):
         sc, html, final, ms, size = fetch(url)
         if sc == 200:
             seo = parse_seo(html)
             seo.update({"url": url, "status": sc, "response_ms": ms})
             products_data.append(seo)
+        if (i + 1) % 25 == 0 or i + 1 == len(targets):
+            print(f"  товарів: [{i+1}/{len(targets)}]", end="\r", flush=True)
 
     # Robots + sitemap главный
     sc_robots, robots_text, _, _, _ = fetch(f"{base}/robots.txt")
@@ -949,6 +965,63 @@ def generate_report(products, categories, html, audit_data):
                     md.append(f"- `{ex}`")
                 md.append("")
 
+    # ── Полный обзор ВСЕХ находок (все 25 типов, чтобы ничего не терялось) ──
+    md.append("\n## 📋 Повний перелік знахідок (всі типи)\n")
+    md.append("Усі типи перевірок — навіть ті, що вже описані вище окремою секцією. "
+              "Якщо щось знайдено, але немає окремої секції з рецептом — це означає що це **інформативна** "
+              "знахідка (можна виправити вручну в адмінці).\n")
+
+    findings = audit_data["findings"]
+    # Описание каждого ключа findings (что это и куда чинить)
+    finding_meta = {
+        "countdown_expired": ("Минулі countdown_end_time", "🟢 fix через API: `countdown`"),
+        "mod_title_empty": ("Пуста назва модифікації", "🟢 fix через API: `mod-title`"),
+        "discount_unmarked": ("Знижка є, але `discount=0`", "🟢 fix через API: `discount`"),
+        "seo_title_empty": ("Порожній SEO-title", "🟢 fix через API: `seo`"),
+        "seo_description_empty": ("Порожній SEO-description", "🟢 fix через API: `seo`"),
+        "seo_keywords_empty": ("Порожні SEO-keywords", "🟢 fix через API: `seo`"),
+        "h1_empty": ("Порожній h1_title", "🟢 fix через API: `seo`"),
+        "mpn_missing": ("Відсутній MPN", "🟢 fix через API: `mpn`"),
+        "duplicate_descriptions": ("Дублі описів між товарами", "🟢 fix через API: `dup-desc`"),
+        "installments_disabled": ("Вимкнена «Оплата частинами»", "🟢 fix через API: `installments`"),
+        "no_sale_sticker": ("Знижка є, стикера «Распродаж» нема", "🟢 fix через API: `sticker-sale`"),
+        "inline_styles_in_desc": ("Inline-стилі в HTML описів", "🟢 fix через API: `inline-styles`"),
+        "no_accessories": ("Немає cross-sell аксесуарів", "🟢 fix через API: `cross-sell`"),
+        "no_alt_parent": ("Немає альтернативних категорій", "🟡 в адмінці: Каталог → Категорії"),
+        "no_gifts": ("Немає товарів-подарунків", "🟡 в адмінці: Каталог → Товари → Подарунки"),
+        "gtin_missing": ("Відсутній GTIN/штрихкод", "🟡 в адмінці: Каталог → Товари → Параметри для фідів"),
+        "uktzed_empty": ("Порожній УКТ ВЕД", "🟡 в адмінці: Каталог → Товари → УКТ ВЕД (через API не пишеться)"),
+        "hidden_products": ("Приховані товари (display_in_showcase=0)", "🟡 в адмінці: вирішити долю"),
+        "price_negative": ("Від'ємна ціна (баг)", "🔴 терміново перевірити імпорт"),
+        "price_old_lower_than_price": ("Стара ціна нижче поточної", "🔴 терміново перевірити імпорт"),
+        "price_discount_too_high": ("Знижка > 90% (підозріло)", "🟡 перевірити вручну"),
+        "dup_main_image": ("Дублі головних фото між товарами", "🟡 в адмінці або через `horoshop-photo-audit`"),
+        "title_long": ("`<title>` категорії >70 символів", "🟡 в адмінці: Маркетинг → SEO → Шаблони"),
+        "info_meta_desc_empty": ("Інфо-сторінка без `<meta description>`", "🟡 в адмінці: Сайт → Сторінки"),
+        "homepage_no_h1": ("На головній немає `<h1>`", "🟡 в адмінці: Сайт → Дизайн → Редактор"),
+        "h1_duplicates": ("Дублі `<h1>` на сторінці", "🟡 в адмінці: Сайт → Дизайн → Редактор"),
+        "category_no_seotext": ("Категорія без SEO-тексту", "🟡 в адмінці: Каталог → Категорія → SEO-текст"),
+    }
+
+    md.append("| # | Знахідка | Кількість | Як чинити |")
+    md.append("|---|---|---|---|")
+    all_keys = sorted(findings.keys(), key=lambda k: -(len(findings[k]) if isinstance(findings[k], list) else 0))
+    for i, key in enumerate(all_keys, 1):
+        v = findings[key]
+        cnt = len(v) if isinstance(v, list) else 0
+        if cnt == 0:
+            continue
+        label, fix_hint = finding_meta.get(key, (key, "🟡 див. деталі"))
+        md.append(f"| {i} | {label} (`{key}`) | {cnt} | {fix_hint} |")
+
+    # Если есть найденные ключи без описания — предупреждение
+    unknown = [k for k in all_keys if k not in finding_meta and isinstance(findings[k], list) and len(findings[k]) > 0]
+    if unknown:
+        md.append("")
+        md.append(f"⚠️ Знайдено {len(unknown)} типів знахідок без опису в шаблоні: `{', '.join(unknown)}`. "
+                  f"Перевір код `audit.py` та оновлюй `finding_meta`.")
+    md.append("")
+
     md.append("\n## 🚫 Що НЕ змінюємо\n")
     md.append("- robots.txt — стандартний для платформи")
     md.append("- Sitemap.xml — генерується автоматично")
@@ -977,6 +1050,12 @@ def generate_report(products, categories, html, audit_data):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Horoshop full audit")
+    parser.add_argument("--sample", type=int, default=None,
+                        help="Размер выборки товаров для HTML-парсинга. Default: все.")
+    args = parser.parse_args()
+
     print(f"=== Аудит {DOMAIN} ===\n")
 
     products = export_catalog()
@@ -985,7 +1064,7 @@ def main():
     categories = export_categories()
     Path("categories.json").write_text(json.dumps(categories, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    html = html_audit(products)
+    html = html_audit(products, sample_size=args.sample)
     Path("html_audit.json").write_text(json.dumps(html, ensure_ascii=False, indent=2), encoding="utf-8")
 
     audit_data = audit_products(products)

@@ -7,18 +7,29 @@ description: Поиск противоречий между текстом оп�
 
 Поиск конфликтов между описанием и характеристиками товара.
 
-## Что находит
+## Что находит (9 типов проверок)
 
-| Тип конфликта | Пример |
-|---|---|
-| Материал расходится | description: «100% бавовна», `characteristics.material`: «поліестер» |
-| Страна расходится | description: «зроблено в Польщі», `characteristics.country`: «Україна» |
-| Размер в описании ≠ заявленному | title: «розмір 50×70», description: «70×100» |
-| Цвет расходится | title: «чорний», `color` (top-level): «білий» |
+| # | Тип конфликта | Пример |
+|---|---|---|
+| 1 | Материал текст vs char | description: «100% бавовна», `characteristics.material`: «поліестер» |
+| 2 | Страна текст vs char | description: «зроблено в Польщі», `characteristics.country`: «Україна» |
+| 3 | Цвет в title vs `color` | title: «чорний», `color`: «білий» |
+| 4 | Размер title vs description | title: «50×70», description: «70×100» |
+| 5 | Discount math mismatch | discount=20%, но (price_old-price)/price_old = 35% |
+| 6 | Placeholder в тексте | «lorem ipsum», «todo», «тест тест» в description |
+| 7 | Mod attribute drift | у родителя material=сатин, у модификаций mix микросатин/полиэстер |
+| 8 | Negative price | price < 0 (баг импорта) |
+| 9 | Negative stock | quantity < 0 на складе |
 
 **Где живут поля** (важно — в API Хорошопа):
 - `material`, `country` — внутри `characteristics.<key>` (имя ключа кастомное у каждого магазина)
 - `color` — top-level поле товара (`p.color`), НЕ в `characteristics`. Скрипт сначала проверяет top-level, на fallback — `characteristics.color` для нестандартных шаблонов
+- `price`, `price_old`, `discount` — top-level
+- `residues[]` — top-level массив остатков по складам
+
+## Прозрачность отчёта
+
+Если конфликтов 0 — `CONSISTENCY_REPORT.md` всё равно показывает **что было проверено** (9 типов), чтобы пользователь видел масштаб скана. «0 знайдено» — это валидный результат.
 
 ## Почему это важно
 
