@@ -84,32 +84,109 @@ def strip_html(t):
     return re.sub(r"<[^>]+>", " ", t or "")
 
 
-# ─── Паттерны ──────────────────────────────────────────────────────────────
+# ─── Паттерны (адаптация stop-slop фреймворка Hardik Pandya для UA/RU) ─────
 
-# AI-стоп-слоп (русск. + укр.)
+# 1. Throat-clearers — заглушки перед мыслью
+THROAT_CLEARERS = [
+    # RU
+    "стоит отметить", "следует отметить", "следует заметить",
+    "стоит обратить внимание", "необходимо отметить",
+    "хотелось бы сказать", "хотелось бы", "надо сказать",
+    "по сути", "на самом деле",
+    # UA
+    "варто зазначити", "варто звернути увагу",
+    "слід відмітити", "слід зауважити", "слід зазначити",
+    "хотілось би сказати", "хотілось би", "треба сказати",
+    "по суті", "насправді ж",
+]
+
+# 2. Эмфазные пустышки (emphasis crutches) + длинные глагольные обороты
 AI_SLOP_PHRASES = [
-    "является", "представляет собой", "при этом", "по сути", "в целом",
-    "буквально", "крайне", "весьма", "не просто",
-    "стоит отметить", "хотелось бы", "следует отметить",
-    "являє собою", "при цьому", "загалом", "буквально", "вкрай",
-    "варто зазначити", "хотілось би",
+    # RU
+    "является", "представляет собой", "выступает в качестве",
+    "при этом", "в целом", "в общем",
+    "буквально", "крайне", "весьма", "очень-очень",
+    "действительно", "по-настоящему",
+    "безусловно", "однозначно", "непременно",
+    "не просто",
+    # UA
+    "являє собою", "виступає в якості", "виступає як",
+    "при цьому", "загалом", "в цілому",
+    "буквально", "вкрай", "вельми",
+    "справді", "дійсно",
+    "однозначно", "безумовно", "неодмінно",
 ]
 
-# Маркетинг-вода
+# 3. Маркетинг-вода — превосходные степени без основания + псевдо-эмо
 MARKETING_FLUFF = [
-    "высочайшее качество", "непревзойденный", "уникальный", "инновационный",
-    "передовой", "специально для вас", "именно для вашего комфорта",
-    "найвища якість", "неперевершений", "унікальний", "інноваційний",
-    "спеціально для вас", "саме для вашого комфорту", "лідер ринку",
+    # RU
+    "высочайшее качество", "непревзойденный", "уникальный",
+    "инновационный", "передовой", "лидер рынка",
+    "безупречный", "исключительный", "революционный",
+    "специально для вас", "именно для вашего комфорта",
+    "ваш надёжный помощник", "ваш надежный помощник", "ваш лучший выбор",
+    # UA
+    "найвища якість", "неперевершений", "унікальний",
+    "інноваційний", "передовий", "лідер ринку",
+    "бездоганний", "винятковий", "революційний",
+    "спеціально для вас", "саме для вашого комфорту",
+    "ваш надійний помічник", "ваш найкращий вибір",
 ]
 
-# Дубли слов
+# 4. Бизнес-жаргон
+BUSINESS_JARGON = [
+    # RU/EN borrowed
+    "реализовать", "внедрить", "оптимизировать", "масштабировать",
+    "синергия", "экосистема", "парадигма",
+    "в современных реалиях",
+    # UA
+    "реалізувати", "впровадити", "оптимізувати", "масштабувати",
+    "синергія", "екосистема", "парадигма",
+    "у нашій парадигмі", "з огляду на сучасні реалії",
+]
+
+# 5. Vague declaratives — что-то важное без указания что
+VAGUE_DECLARATIVES = [
+    # RU
+    "причины структурные", "последствия значительны",
+    "это имеет значение", "ставки высоки",
+    # UA
+    "причини є структурними", "наслідки значні",
+    "це має значення", "ставки високі",
+]
+
+# 6. Lazy extremes — ленивые крайности
+LAZY_EXTREMES = [
+    # RU
+    "всегда", "никогда", "каждый раз", "ни один",
+    # UA
+    "завжди", "ніколи", "кожного разу", "жоден",
+]
+
+# 7. Бинарные контрасты — «не X, а Y»
+BINARY_CONTRAST_RE = re.compile(
+    r"\bне\s+(?:просто\s+)?\w+[,.\s—–-]+(?:а|але|но|это|це)\b",
+    re.IGNORECASE,
+)
+
+# 8. False agency — неодушевлённое + человеческий глагол
+FALSE_AGENCY_PATTERNS = [
+    # RU
+    r"\b(?:товар|куртка|матрас|комплект|тканина|технологія|дизайн)\s+(?:дозволяє|пропонує|забезпечує|розповідає|знає|пам.ятає)\b",
+    r"\b(?:товар|куртка|матрас|комплект|ткань|технология|дизайн)\s+(?:позволяет|предлагает|обеспечивает|рассказывает|знает|помнит)\b",
+]
+FALSE_AGENCY_RE = [re.compile(p, re.IGNORECASE) for p in FALSE_AGENCY_PATTERNS]
+
+# 9. Em dashes (без пробелов — английский стиль)
+EM_DASH_RE = re.compile(r"\w—\w")
+
+# 10. Дубли слов
 DUP_WORDS_RE = re.compile(r"\b(\w{2,})\s+\1\b", re.IGNORECASE)
 
-# Caps lock
+# 11. Caps lock
 CAPS_LOCK_RE = re.compile(r"\b[А-ЯЁІЇЄҐA-Z]{6,}\b")
 
-# Дубли букв (в одном слове, например «оооочень»)
+# 12. Дубли букв (в одном слове, например «оооочень»)
 LETTER_DUP_RE = re.compile(r"(\w)\1{3,}", re.IGNORECASE)
 
 
@@ -117,6 +194,19 @@ def split_sentences(text):
     """Грубое разделение на предложения."""
     text = re.sub(r"\s+", " ", text).strip()
     return [s.strip() for s in re.split(r"[.!?]+\s+", text) if s.strip()]
+
+
+def _find_phrases(plain, phrases, limit=3):
+    """Ищет вхождения по подстроке. Возвращает уникальный список."""
+    found = []
+    seen = set()
+    for ph in phrases:
+        if ph.lower() in plain and ph.lower() not in seen:
+            found.append(ph)
+            seen.add(ph.lower())
+            if len(found) >= limit:
+                break
+    return found
 
 
 def check_text(text):
@@ -127,42 +217,66 @@ def check_text(text):
     plain = strip_html(text).lower()
     plain_orig = strip_html(text)
 
-    # AI-стоп-слоп
-    found_slop = []
-    for ph in AI_SLOP_PHRASES:
-        if ph.lower() in plain:
-            found_slop.append(ph)
-    if found_slop:
-        issues.append({"type": "ai_slop", "examples": found_slop[:3]})
+    # 1. Throat-clearers (заглушки)
+    if found := _find_phrases(plain, THROAT_CLEARERS):
+        issues.append({"type": "throat_clearer", "examples": found})
 
-    # Маркетинг-вода
-    found_fluff = []
-    for ph in MARKETING_FLUFF:
-        if ph.lower() in plain:
-            found_fluff.append(ph)
-    if found_fluff:
-        issues.append({"type": "marketing_fluff", "examples": found_fluff[:3]})
+    # 2. AI-стоп-слоп / эмфазные пустышки
+    if found := _find_phrases(plain, AI_SLOP_PHRASES):
+        issues.append({"type": "ai_slop", "examples": found})
 
-    # Дубли слов
+    # 3. Маркетинг-вода
+    if found := _find_phrases(plain, MARKETING_FLUFF):
+        issues.append({"type": "marketing_fluff", "examples": found})
+
+    # 4. Бизнес-жаргон
+    if found := _find_phrases(plain, BUSINESS_JARGON):
+        issues.append({"type": "business_jargon", "examples": found})
+
+    # 5. Vague declaratives
+    if found := _find_phrases(plain, VAGUE_DECLARATIVES):
+        issues.append({"type": "vague_declarative", "examples": found})
+
+    # 6. Lazy extremes (только если без числового пруфа рядом)
+    extremes_found = _find_phrases(plain, LAZY_EXTREMES, limit=5)
+    if extremes_found:
+        issues.append({"type": "lazy_extreme", "examples": extremes_found[:3]})
+
+    # 7. Бинарные контрасты «не X, а Y»
+    binary_matches = BINARY_CONTRAST_RE.findall(plain_orig)
+    if binary_matches:
+        issues.append({"type": "binary_contrast", "count": len(binary_matches), "example": binary_matches[0]})
+
+    # 8. False agency (неодушевлённое + чел. глагол)
+    for rx in FALSE_AGENCY_RE:
+        m = rx.search(plain_orig)
+        if m:
+            issues.append({"type": "false_agency", "example": m.group(0)})
+            break
+
+    # 9. Em dashes без пробелов
+    em_dashes = EM_DASH_RE.findall(plain_orig)
+    if em_dashes:
+        issues.append({"type": "em_dash", "count": len(em_dashes)})
+
+    # 10. Дубли слов
     dups = DUP_WORDS_RE.findall(plain_orig)
-    # Фильтр: исключаем валидные повторы типа "так-так" в кавычках, цифры, и т.д.
     dups = [d for d in dups if d.lower() not in ("так", "ну")]
     if dups:
         issues.append({"type": "duplicate_words", "examples": list(set(dups))[:3]})
 
-    # CAPS LOCK слова
+    # 11. CAPS LOCK слова
     caps = CAPS_LOCK_RE.findall(plain_orig)
-    # Фильтр аббревиатур типа GTIN, MPN, USB
     caps = [c for c in caps if len(c) > 6 and c not in ("GTIN", "USB", "USA", "GMBH")]
     if caps:
         issues.append({"type": "caps_lock", "examples": list(set(caps))[:3]})
 
-    # Дубли букв
+    # 12. Дубли букв
     letter_dups = LETTER_DUP_RE.findall(plain_orig)
     if letter_dups:
         issues.append({"type": "letter_repeats", "examples": list(set(letter_dups))[:3]})
 
-    # Длинные предложения
+    # 13. Длинные предложения
     sentences = split_sentences(plain_orig)
     long_sentences = [s for s in sentences if len(s.split()) > 35]
     if long_sentences:
@@ -267,20 +381,66 @@ def generate_report(findings, total_main):
                     md.append(f"- ⚠️ `{f}` — **{t}**: {examples}")
             md.append("")
 
+    # ── stop-slop scoring (1-10 по 5 измерениям) ──────────────────────────
+    md.append("\n## 🎯 Stop-Slop Score\n")
+    md.append("За фреймворком [stop-slop](https://github.com/hvpandya/stop-slop) (Hardik Pandya). 1-10, де 10 = ідеально.\n")
+
+    issues_per_product = (sum(len(p["issues"]) for p in products) / max(len(products), 1)) if products else 0
+    affected_pct = len(products) / total_main * 100 if total_main else 0
+
+    # Эвристика: чем больше типов проблем + чем больше товаров затронуто, тем хуже
+    directness = max(1, 10 - by_type.get("throat_clearer", 0) // max(total_main // 10, 1) - by_type.get("ai_slop", 0) // max(total_main // 10, 1))
+    rhythm = max(1, 10 - by_type.get("long_sentence", 0) // max(total_main // 10, 1) - by_type.get("em_dash", 0) // max(total_main // 5, 1))
+    trust = max(1, 10 - by_type.get("marketing_fluff", 0) // max(total_main // 10, 1) - by_type.get("vague_declarative", 0) // max(total_main // 5, 1))
+    authenticity = max(1, 10 - by_type.get("false_agency", 0) // max(total_main // 10, 1) - by_type.get("binary_contrast", 0) // max(total_main // 5, 1))
+    density = max(1, 10 - by_type.get("business_jargon", 0) // max(total_main // 10, 1) - by_type.get("lazy_extreme", 0) // max(total_main // 10, 1))
+
+    total = directness + rhythm + trust + authenticity + density
+    md.append("| Вимір | Питання | Бал |")
+    md.append("|---|---|---|")
+    md.append(f"| Прямота | Твердження або оголошення? | **{directness}/10** |")
+    md.append(f"| Ритм | Різноманітний чи метроном? | **{rhythm}/10** |")
+    md.append(f"| Довіра | Поважає інтелект читача? | **{trust}/10** |")
+    md.append(f"| Аутентичність | Звучить як людина? | **{authenticity}/10** |")
+    md.append(f"| Щільність | Чи є що вирізати? | **{density}/10** |")
+    md.append(f"\n**Загалом: {total}/50**")
+    if total < 35:
+        md.append("\n🔴 Менше 35/50 — описи потребують переписування.")
+    elif total < 42:
+        md.append("\n🟡 Робота над помилками — описи стерпні, але є куди ростити.")
+    else:
+        md.append("\n🟢 Описи на високому рівні. Підтримуй стандарт.")
+    md.append("")
+
     md.append("\n## 💡 Що з цим робити\n")
+    if by_type.get("throat_clearer", 0) > 0:
+        md.append(f"- **{by_type['throat_clearer']} текстів зі словами-паразитами** («варто зазначити», «слід відмітити») — почати з суті")
     if by_type.get("ai_slop", 0) > 0:
-        md.append(f"- **{by_type['ai_slop']} текстів з AI-стоп-слопом** — переписати без слів «являє собою», «при цьому», «варто зазначити». Або використай скіл `stop-slop` для масової чистки")
+        md.append(f"- **{by_type['ai_slop']} текстів з AI-стоп-слопом** — переписати без «являє собою», «при цьому», «справді»")
     if by_type.get("marketing_fluff", 0) > 0:
         md.append(f"- **{by_type['marketing_fluff']} текстів з маркетинг-водою** — замінити «найвища якість» на конкретні факти")
+    if by_type.get("business_jargon", 0) > 0:
+        md.append(f"- **{by_type['business_jargon']} текстів з бізнес-жаргоном** — «реалізувати» → «зробити», «оптимізувати» → «покращити»")
+    if by_type.get("binary_contrast", 0) > 0:
+        md.append(f"- **{by_type['binary_contrast']} бінарних контрастів** («не X, а Y») — сказати Y напряму без негації")
+    if by_type.get("false_agency", 0) > 0:
+        md.append(f"- **{by_type['false_agency']} текстів з фальшивою агентністю** («тканина дозволяє вам») — назвати людину: «Ви відчуваєте комфорт завдяки тканині»")
+    if by_type.get("em_dash", 0) > 0:
+        md.append(f"- **{by_type['em_dash']} em-dash без пробілів** — англійський стиль, замінити на «, » або « — »")
+    if by_type.get("vague_declarative", 0) > 0:
+        md.append(f"- **{by_type['vague_declarative']} нечітких декларативів** — назвати конкретно або видалити")
+    if by_type.get("lazy_extreme", 0) > 0:
+        md.append(f"- **{by_type['lazy_extreme']} ледачих крайнощів** («завжди», «ніколи») — підкріпити цифрами або прибрати")
     if by_type.get("duplicate_words", 0) > 0:
-        md.append(f"- **{by_type['duplicate_words']} текстів з повторами слів** — це баг вводу, прибрати руками")
+        md.append(f"- **{by_type['duplicate_words']} текстів з повторами слів** — баг вводу, прибрати руками")
     if by_type.get("long_sentence", 0) > 0:
-        md.append(f"- **{by_type['long_sentence']} довгих речень** — розбити на 2-3 коротших для кращого скану")
+        md.append(f"- **{by_type['long_sentence']} довгих речень** — розбити на 2-3 коротших")
     if by_type.get("caps_lock", 0) > 0:
-        md.append(f"- **{by_type['caps_lock']} CAPS-слів** — текст «кричить» на читача, замінити на нормальний регістр")
+        md.append(f"- **{by_type['caps_lock']} CAPS-слів** — текст «кричить», замінити на нормальний регістр")
 
     md.append("\n---\n")
     md.append("📝 *Згенеровано скілом [horoshop-text-quality](https://github.com/IgorShutko/horoshop-claude-skill) — Target+ Agency.*  ")
+    md.append("*Stop-Slop фреймворк — [Hardik Pandya](https://hvpandya.com), MIT.*  ")
     md.append("*Допомога з переписуванням текстів? [TG @shutko_ads](https://t.me/shutko_ads).*")
 
     return "\n".join(md)
