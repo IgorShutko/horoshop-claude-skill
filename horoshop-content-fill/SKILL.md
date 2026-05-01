@@ -153,6 +153,7 @@ python3 ${SKILL_DIR}/scripts/apply_content.py
 
 - `references/content_templates.md` — структура полей (что должно быть в description, какая длина, что в short)
 - `references/prompt_recipes.md` — паттерны генерации, чего избегать, тональность
+- `references/horoshop_help.md` — выжимка из справки Хорошопа: текстовые поля карточки, что в `description` vs `short_description` vs `marketplace_description`, SEO шаблоны, code 11, Шаблон даних. **Цитируй её при превью/отчётах со ссылками на источник.**
 
 ## Что НЕ делать
 

@@ -168,3 +168,4 @@ HOROSHOP_DOMAIN=... HOROSHOP_LOGIN=... HOROSHOP_PASSWORD=... \
 - `references/api_quickref.md` — справочник API endpoints, какие поля редактируются
 - `references/audit_checklist.md` — полный список 22 проверок (10 API-фиксов + 8 admin + 4 баг-проверки данных) с обоснованиями
 - `references/fix_recipes.md` — детали каждого из 10 API-фиксов: что именно пишется, какие edge-cases, шаблоны для preview
+- `references/horoshop_help.md` — **выжимка из официальной справки Хорошопа** со ссылками на `help.horoshop.ua`. Это «общий для всех скиллов» источник: API, стикеры, SEO шаблоны, sitemap, robots, шаблон данных, скидки, оплата, доставка, версии v3/v4. **Цитируй её в REPORT.md** для каждой рекомендации в формате `[Источник: <название> — <URL>]`.

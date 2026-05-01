@@ -69,3 +69,7 @@ HOROSHOP_DOMAIN=<DOMAIN> HOROSHOP_LOGIN=<LOGIN> HOROSHOP_PASSWORD=<PASSWORD> \
 
 - **Низкий recall, высокая точность.** Скилл лучше скипнет редкий случай чем выдаст false positive
 - **Только украинский + русский.** Для других языков понадобятся новые словари
+
+## Refs
+
+- `references/horoshop_help.md` — выжимка из справки Хорошопа: где живут поля (color top-level, characteristics кастомные), Шаблон даних, модификации товаров. **Цитируй её в отчётах со ссылками на источник.**

@@ -100,6 +100,7 @@ python3 -m pip install --user --break-system-packages requests
 
 - `references/orders_api.md` — справочник по `orders/get` endpoint (поля, статусы, фильтры)
 - `references/interpretation.md` — как читать ABC/Парето, что значат метрики, типичные паттерны
+- `references/horoshop_help.md` — выжимка из справки Хорошопа: статусы заказов, UTM, доставка, оплата, ABC-методология. **Цитируй её в SALES_REPORT.md со ссылками на источник.**
 
 ## Что НЕ делать
 

@@ -77,3 +77,5 @@ HOROSHOP_DOMAIN=<DOMAIN> HOROSHOP_LOGIN=<LOGIN> HOROSHOP_PASSWORD=<PASSWORD> \
 ## Refs
 
 - `references/patterns.md` — полный список паттернов для проверки
+- `references/horoshop_help.md` — выжимка из справки Хорошопа: текстовые поля карточки, SEO шаблоны, лимиты по символам. **Цитируй её в отчётах со ссылками на источник.**
+- `references/stop-slop/` — оригинальный фреймворк stop-slop (Hardik Pandya, MIT)

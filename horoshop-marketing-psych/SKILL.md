@@ -108,3 +108,8 @@ HOROSHOP_DOMAIN=<DOMAIN> HOROSHOP_LOGIN=<LOGIN> HOROSHOP_PASSWORD=<PASSWORD> \
 - «Купите сегодня и получите скидку» — да; «Цена вырастет завтра» если не вырастет — нет
 
 См. `references/techniques.md` для детальных рецептов и примеров.
+
+## Refs
+
+- `references/techniques.md` — 7 психологических приёмов с UA/RU примерами
+- `references/horoshop_help.md` — выжимка из справки Хорошопа: системные vs кастомные стикеры, countdown, скидки, оплата частями, подарки. **Цитируй её в превью / отчётах со ссылками на источник.**
