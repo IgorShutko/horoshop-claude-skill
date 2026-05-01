@@ -56,6 +56,68 @@ def get_token():
     return _token
 
 
+# Системные стикеры — есть всегда (документация Хорошопа: «Стикеры в карточке товара»)
+SYSTEM_STICKERS_RU = {"Хит", "Распродажа", "Новинка", "Размер скидки", "Видео",
+                     "Счетчик акции", "Новинка (авто)",
+                     "«Оплата частями» ПриватБанка", "«Покупка частями» от monobank"}
+SYSTEM_STICKERS_UA = {"Хіт", "Розпродаж", "Новинка", "Розмір знижки", "Відео",
+                     "Лічильник акції", "Новинка (авто)",
+                     "«Оплата частинами» ПриватБанку", "«Покупка частинами» від monobank"}
+
+
+def fetch_available_stickers():
+    """Получает список существующих стикеров через icons/export (v4 only).
+
+    Возвращает set имён или None, если endpoint недоступен (v3).
+    """
+    try:
+        r = session.post(f"{BASE_URL}/icons/export/", json={"token": get_token()}, timeout=30)
+        r.raise_for_status()
+        d = r.json()
+        if d.get("status") == "OK":
+            names = set()
+            for ic in d.get("response", {}).get("icons", []):
+                title = ic.get("title")
+                if title:
+                    names.add(title)
+            return names
+    except Exception as e:
+        print(f"  ⚠ icons/export недоступен ({e}). Магазин на v3? Стикеры не валидируем.")
+    return None
+
+
+def filter_icons(updates, available):
+    """Фильтрует icons[] в updates, оставляя только существующие.
+
+    Возвращает (filtered_updates, missing_stickers_set).
+    Если available is None — фильтрация не выполняется (доверяем юзеру).
+    """
+    if available is None:
+        return updates, set()
+
+    # Нечувствительность к регистру для сопоставления
+    available_lower = {n.lower() for n in available}
+    # Системные тоже добавляем (на случай если icons/export их не вернул)
+    available_lower |= {s.lower() for s in SYSTEM_STICKERS_RU | SYSTEM_STICKERS_UA}
+
+    missing = set()
+    filtered = []
+    for u in updates:
+        if "icons" in u and u["icons"]:
+            kept = []
+            for ic in u["icons"]:
+                if ic.lower() in available_lower:
+                    kept.append(ic)
+                else:
+                    missing.add(ic)
+            new_u = dict(u)
+            new_u["icons"] = kept
+            filtered.append(new_u)
+        else:
+            filtered.append(u)
+    return filtered, missing
+
+
 def normalize_update(u):
     """Превращает {article, description, short_description, icons} в формат API."""
     out = {"article": u["article"]}
@@ -63,7 +125,7 @@ def normalize_update(u):
         if fld in u and u[fld]:
             v = u[fld]
             out[fld] = {LANG: v} if isinstance(v, str) else v
-    if "icons" in u:
+    if "icons" in u and u["icons"]:
         out["icons"] = u["icons"]
     return out
 
@@ -143,6 +205,19 @@ def main():
     if not all([DOMAIN, LOGIN, PASSWORD]):
         print("ERROR: env not set", file=sys.stderr)
         sys.exit(1)
+
+    # Валидация стикеров через icons/export (v4) — отбрасываем несуществующие
+    print("\n[validate] Проверка стикеров через icons/export...")
+    available = fetch_available_stickers()
+    if available is not None:
+        print(f"  Доступно стикеров в магазине: {len(available)}")
+    updates, missing = filter_icons(updates, available)
+    if missing:
+        print(f"\n  ⚠ Не существует {len(missing)} стикеров (будут пропущены):")
+        for ic in sorted(missing):
+            print(f"     • {ic}")
+        print(f"\n  Чтобы они работали — создай в админке: Сайт → Стикеры для товаров → Додати")
+        print(f"  Способ активации: «В свойствах товара»")
 
     ans = input(f"\nЗаписать {len(updates)} обновлений в {DOMAIN}? (y/N): ").strip().lower()
     if ans != "y":
