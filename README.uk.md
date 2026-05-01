@@ -72,7 +72,7 @@ Performance-маркетинг для e-commerce та локального бі�
 ## 📊 Як виглядає результат
 
 Повний приклад згенерованого звіту:
-**[examples/sample-REPORT.md](examples/sample-REPORT.md)**
+**[horoshop-full-audit/examples/sample-REPORT.md](horoshop-full-audit/examples/sample-REPORT.md)**
 
 Скіл вивантажує каталог + категорії через API, парсить публічні сторінки, формує REPORT.md з поділом:
 - ✅ Що добре (не чіпаємо)

@@ -145,7 +145,6 @@ def analyze(products, min_photos=4, max_size_kb=500, check_sizes=False):
             })
 
     # Размеры файлов (опционально, медленно)
-    size_findings = []
     if check_sizes:
         urls_to_check = []
         for p in main:
@@ -154,10 +153,14 @@ def analyze(products, min_photos=4, max_size_kb=500, check_sizes=False):
                 urls_to_check.append((p.get("article", ""), get_text(p.get("title")), imgs[0]))
 
         print(f"  HEAD-запросы на {len(urls_to_check)} главных фото...")
+
+        def _head_with_meta(item):
+            art, title, url = item
+            status, size = head_request(url)
+            return (art, title, url, status, size)
+
         with ThreadPoolExecutor(max_workers=10) as ex:
-            for art, title, url in urls_to_check:
-                _ = ex.submit(head_request, url)  # warm-up
-            results = list(ex.map(lambda x: (x[0], x[1], x[2], *head_request(x[2])), urls_to_check))
+            results = list(ex.map(_head_with_meta, urls_to_check))
 
         for art, title, url, status, size in results:
             if status != 200:

@@ -20,8 +20,6 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import requests
-
 DOMAIN = os.getenv("HOROSHOP_DOMAIN")
 LOGIN = os.getenv("HOROSHOP_LOGIN")
 PASSWORD = os.getenv("HOROSHOP_PASSWORD")

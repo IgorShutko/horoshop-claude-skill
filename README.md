@@ -72,7 +72,7 @@ Performance-маркетинг для e-commerce и локального биз�
 ## 📊 Как выглядит результат
 
 Полный пример сгенерированного отчёта по тестовому магазину:
-**[examples/sample-REPORT.md](examples/sample-REPORT.md)**
+**[horoshop-full-audit/examples/sample-REPORT.md](horoshop-full-audit/examples/sample-REPORT.md)**
 
 Скилл выгружает каталог + категории через API, парсит публичные страницы, формирует REPORT.md с разделением:
 - ✅ Что хорошо (не трогаем)

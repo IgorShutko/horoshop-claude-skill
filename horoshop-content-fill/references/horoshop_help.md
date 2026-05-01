@@ -30,7 +30,7 @@
 
 ### `seo_title`, `seo_description`, `seo_keywords`, `h1_title`
 
-- См. `horoshop-text-quality/references/horoshop_help.md` для детальных ограничений
+- См. `~/.claude/skills/horoshop-text-quality/references/horoshop_help.md` для детальных ограничений
 - Заполняются через тот же `catalog/import`
 
 📄 [API: Каталог](https://help.horoshop.ua/ru/articles/3960898-api)
@@ -117,7 +117,7 @@
 - `<script>` (удаляется)
 - Блоки рекламы (отвлекает от покупки)
 - Дублирование с `short_description`
-- Маркетинг-вода («непревзойдённое качество», «лидер рынка») — см. [text-quality](../../horoshop-text-quality/references/patterns.md)
+- Маркетинг-вода («непревзойдённое качество», «лидер рынка») — см. `~/.claude/skills/horoshop-text-quality/references/patterns.md`
 
 ---
 

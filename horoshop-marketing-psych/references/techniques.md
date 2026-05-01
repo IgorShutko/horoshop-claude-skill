@@ -54,7 +54,7 @@
 **Где:**
 - description: «До замовлення — безкоштовний наматрацник у подарунок (вартість 199 грн).»
 - Стикер: «+ Подарунок»
-- `gifts[]` через API (см. `horoshop-full-audit/references/api_quickref.md`)
+- `gifts[]` через API (см. `~/.claude/skills/horoshop-full-audit/references/api_quickref.md` или локальный `references/horoshop_help.md`)
 
 **Эффект:** норма взаимности — получивший «подарок» чаще доводит покупку.
 

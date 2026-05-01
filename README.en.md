@@ -72,7 +72,7 @@ These skills are open-source tools we use ourselves on e-commerce clients runnin
 ## 📊 What the output looks like
 
 Full sample of the auto-generated report:
-**[examples/sample-REPORT.md](examples/sample-REPORT.md)**
+**[horoshop-full-audit/examples/sample-REPORT.md](horoshop-full-audit/examples/sample-REPORT.md)**
 
 The skill exports the catalog + categories via API, parses public pages, then generates `REPORT.md` with three sections:
 - ✅ What's good (don't touch)

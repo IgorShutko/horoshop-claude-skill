@@ -10,7 +10,8 @@ import json
 import os
 import re
 import sys
-from collections import Counter, defaultdict
+import time
+from collections import defaultdict
 from pathlib import Path
 
 import requests
@@ -32,7 +33,6 @@ _token_time = 0
 
 def get_token():
     global _token, _token_time
-    import time
     if _token and (time.time() - _token_time) < 550:
         return _token
     r = session.post(f"{BASE_URL}/auth/", json={"login": LOGIN, "password": PASSWORD}, timeout=30)

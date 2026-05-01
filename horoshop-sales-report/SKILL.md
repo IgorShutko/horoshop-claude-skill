@@ -50,7 +50,7 @@ curl -s -X POST https://<DOMAIN>/api/auth/ \
   -d '{"login":"<LOGIN>","password":"<PASSWORD>"}'
 ```
 
-Если фейл — выдай инструкцию по созданию API-юзера (та же что в `horoshop-full-audit/references/api_admin_setup.md`).
+Если фейл — выдай инструкцию по созданию API-юзера из `references/api_admin_setup.md`.
 
 ## Шаг 3 — Запуск отчёта
 
