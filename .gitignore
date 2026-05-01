@@ -15,3 +15,9 @@ REPORT.md
 fix_*.json
 *_preview_*.json
 audit_*/
+
+# Артефакты sales-report (могут содержать данные клиентов: имена, телефоны, адреса)
+orders.json
+SALES_REPORT.md
+abc.csv
+sales_*/

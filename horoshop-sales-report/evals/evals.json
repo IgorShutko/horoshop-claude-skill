@@ -1,0 +1,35 @@
+{
+  "skill_name": "horoshop-sales-report",
+  "evals": [
+    {
+      "id": 1,
+      "name": "trigger-direct-sales-request",
+      "prompt": "Дай отчёт по продажам магазина mystore.com.ua на хорошопе за последний месяц",
+      "expected_output": "Skill triggers; asks for credentials, runs sales_report.py with --from/--to last 30 days, generates SALES_REPORT.md, shows summary with revenue/AOV/top products."
+    },
+    {
+      "id": 2,
+      "name": "trigger-abc-analysis",
+      "prompt": "Сделай ABC-анализ товаров на горошоп магазине",
+      "expected_output": "Skill triggers; asks for credentials and period; generates ABC analysis with Pareto 80/15/5 grouping."
+    },
+    {
+      "id": 3,
+      "name": "trigger-revenue-question",
+      "prompt": "Сколько мы заработали в апреле на хорошопе? Домен example.com.ua",
+      "expected_output": "Skill triggers; runs report --from 2026-04-01 --to 2026-04-30, shows revenue."
+    },
+    {
+      "id": 4,
+      "name": "should-not-trigger-seo-audit",
+      "prompt": "Сделай SEO-аудит магазина на хорошопе",
+      "expected_output": "Skill does NOT trigger — это про SEO. Должен сработать horoshop-full-audit, не horoshop-sales-report."
+    },
+    {
+      "id": 5,
+      "name": "trigger-aov-question",
+      "prompt": "Какой у меня средний чек на магазине shop.ua за последние 90 дней?",
+      "expected_output": "Skill triggers; запрашивает креды, запускает за 90 дней, выдаёт средний чек по доставленным."
+    }
+  ]
+}
