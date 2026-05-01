@@ -13,8 +13,12 @@ description: Поиск противоречий между текстом оп�
 |---|---|
 | Материал расходится | description: «100% бавовна», `characteristics.material`: «поліестер» |
 | Страна расходится | description: «зроблено в Польщі», `characteristics.country`: «Україна» |
-| Размер в описании ≠ заявленному | title: «розмір 50×70», `characteristics.size`: «70×100» |
-| Цвет расходится | title: «Чорний», description: «біла обложка» |
+| Размер в описании ≠ заявленному | title: «розмір 50×70», description: «70×100» |
+| Цвет расходится | title: «чорний», `color` (top-level): «білий» |
+
+**Где живут поля** (важно — в API Хорошопа):
+- `material`, `country` — внутри `characteristics.<key>` (имя ключа кастомное у каждого магазина)
+- `color` — top-level поле товара (`p.color`), НЕ в `characteristics`. Скрипт сначала проверяет top-level, на fallback — `characteristics.color` для нестандартных шаблонов
 
 ## Почему это важно
 

@@ -243,7 +243,11 @@ def main():
         md.append("| # | Цвет | Использований | Превью |")
         md.append("|---|---|---|---|")
         for i, c in enumerate(css_extract["colors"][:15], 1):
-            preview = f"![](https://via.placeholder.com/40/{c['value'].lstrip('#')}/000000?text=+)" if c["value"].startswith("#") else "—"
+            # placehold.co — действующий сервис превью (via.placeholder.com discontinued)
+            preview = (
+                f"![](https://placehold.co/40x20/{c['value'].lstrip('#')}/{c['value'].lstrip('#')}.png)"
+                if c["value"].startswith("#") else "—"
+            )
             md.append(f"| {i} | `{c['value']}` | {c['count']} | {preview} |")
         md.append("")
 

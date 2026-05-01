@@ -155,6 +155,18 @@ def get_char_value(p, char_keys):
     return None
 
 
+def get_top_level_value(p, key):
+    """Для полей вне characteristics (color — top-level в Horoshop API).
+
+    На экспорте формат: {"id": N, "value": {"ua": "...", "ru": "..."}}.
+    """
+    v = p.get(key)
+    if not v:
+        return None
+    val = get_text(v) if isinstance(v, dict) else str(v)
+    return val.strip().lower() if val and val.strip() else None
+
+
 def analyze(products):
     findings = defaultdict(list)
     main = [p for p in products if p.get("article") == p.get("parent_article")]
@@ -198,17 +210,18 @@ def analyze(products):
                     "char_value": country_in_chars,
                 })
 
-        # 3. Цвет
+        # 3. Цвет (color — top-level поле в Horoshop API, не в characteristics)
         color_in_title_set = detect_in_text(title, COLORS)
-        color_in_chars = get_char_value(p, ["color", "kolr", "colour"])
-        if color_in_chars:
-            color_in_chars_set = detect_in_text(color_in_chars, COLORS)
+        # Сначала смотрим top-level color, потом — characteristics (на случай кастомных шаблонов)
+        color_value = get_top_level_value(p, "color") or get_char_value(p, ["color", "kolr", "colour"])
+        if color_value:
+            color_in_chars_set = detect_in_text(color_value, COLORS)
             if color_in_title_set and color_in_chars_set and not (color_in_title_set & color_in_chars_set):
                 findings["color_conflict"].append({
                     "article": article, "title": title,
                     "in_title": list(color_in_title_set),
                     "in_characteristics": list(color_in_chars_set),
-                    "char_value": color_in_chars,
+                    "char_value": color_value,
                 })
 
         # 4. Размеры (грубо: ловим NNxNN или NN×NN в title и описании, сравниваем)
