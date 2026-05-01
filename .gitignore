@@ -58,5 +58,6 @@ psych_*/
 
 # Артефакты suite (мета-оркестратор)
 SUITE_REPORT.md
+suite_status.json
 suite_*/
 logs/

@@ -17,7 +17,15 @@ import requests
 from bs4 import BeautifulSoup
 
 session = requests.Session()
-session.headers.update({"User-Agent": "Mozilla/5.0 (Horoshop Design Extract)"})
+# Современный браузерный UA — некоторые магазины отдают пустую заглушку bot-friendly UA
+session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "uk-UA,uk;q=0.9,ru;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+})
 
 
 def fetch(url, **kw):
@@ -168,12 +176,42 @@ def main():
     print("[1/4] Загружаю главную...")
     sc, html, _, final = fetch(url)
     if sc != 200:
-        print(f"ERROR: статус {sc}", file=sys.stderr)
+        print(f"ERROR: статус {sc} — головна не доступна", file=sys.stderr)
         sys.exit(1)
+
+    # Sanity-check: HTML должен быть осмысленного размера
+    html_len = len(html)
+    print(f"  HTML розмір: {html_len} байт")
+    if html_len < 1000:
+        print(f"\n❌ ERROR: HTML занадто короткий ({html_len} байт).", file=sys.stderr)
+        print("   Можливі причини:", file=sys.stderr)
+        print("     • JS-rendered SPA (контент рендериться браузером)", file=sys.stderr)
+        print("     • Cloudflare/WAF challenge (треба JS-капча)", file=sys.stderr)
+        print("     • Сайт лежить", file=sys.stderr)
+        print("\n   Workaround: спробуй інший User-Agent або headless browser (Playwright).", file=sys.stderr)
+        sys.exit(2)
+
+    # Детект Cloudflare challenge
+    lower_html = html[:5000].lower()
+    if "cloudflare" in lower_html and ("challenge" in lower_html or "checking your browser" in lower_html):
+        print(f"\n❌ ERROR: Cloudflare challenge виявлено. Сайт за WAF.", file=sys.stderr)
+        print("   Workaround: headless browser (Playwright) або cloudscraper.", file=sys.stderr)
+        sys.exit(2)
 
     # 2. HTML парсинг
     info = parse_homepage(url, html)
     print(f"  CSS files: {len(info['css_files'])}, logo: {bool(info['logo_url'])}, favicon: {bool(info['favicon_url'])}")
+
+    # Sanity: должен быть хотя бы какой-то <head> / <body>
+    if not info["css_files"] and not info["inline_styles"] and not info["logo_url"] and not info["favicon_url"]:
+        print(f"\n❌ ERROR: HTML отриманий, але в ньому немає ані CSS, ані лого, ані favicon.", file=sys.stderr)
+        print("   Це означає що:", file=sys.stderr)
+        print("     • Контент завантажується через JS (SPA)", file=sys.stderr)
+        print("     • Сайт використовує лендінг-конструктор без зовнішніх стилів", file=sys.stderr)
+        print("     • HTML — це fallback-заглушка (анти-бот)", file=sys.stderr)
+        print(f"\n   Перші 500 символів HTML для діагностики:", file=sys.stderr)
+        print(f"   {html[:500]!r}", file=sys.stderr)
+        sys.exit(3)
 
     # 3. CSS — соединяем inline + первые N внешних
     print(f"[2/4] Парсинг CSS (inline + до {args.max_css} файлов)...")
@@ -189,6 +227,11 @@ def main():
 
     css_extract = extract_from_css(all_css)
     print(f"  Цветов уникальных: {len(css_extract['colors'])}, шрифтов: {len(css_extract['fonts'])}, переменных: {len(css_extract['variables'])}")
+
+    if len(css_extract["colors"]) == 0 and len(css_extract["fonts"]) == 0:
+        print(f"\n⚠️ WARNING: CSS отриманий, але в ньому 0 кольорів і 0 шрифтів.", file=sys.stderr)
+        print(f"   Це нетипово для працюючого сайту. Перевір вручну: {url}", file=sys.stderr)
+        # Не выходим с ошибкой — может быть редкий случай. Просто предупреждаем.
 
     # 4. Скачивание ассетов
     if not args.no_download:

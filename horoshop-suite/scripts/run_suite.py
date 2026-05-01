@@ -96,22 +96,46 @@ def short_summary(file_path, max_chars=600):
     return "\n".join(body).strip()
 
 
+# Маппинг: имя скилла → файл артефакта (используется и в merge, и в статус-таблице)
+SKILL_REPORT_FILES = {
+    "audit": "REPORT.md",
+    "sales": "SALES_REPORT.md",
+    "gaps": "gaps.json",
+    "photo": "PHOTO_REPORT.md",
+    "text": "TEXT_QUALITY_REPORT.md",
+    "consistency": "CONSISTENCY_REPORT.md",
+    "design": "DESIGN_SYSTEM.md",
+}
+
+
 def generate_suite_report(domain, completed_skills, args):
-    """Собираем executive summary."""
+    """Собирает executive summary.
+
+    Важно: проходит по ВСЕМ скиллам списка (не только по completed_skills),
+    проверяя наличие соответствующих артефактов на диске.
+    Это позволяет использовать --only audit,design без перетирания
+    summary остальных скиллов из предыдущих запусков.
+    """
     md = []
     today = datetime.now().strftime("%Y-%m-%d %H:%M")
     md.append(f"# Комплексний аудит `{domain}`\n")
     md.append(f"**Згенеровано:** {today}\n")
-    md.append(f"**Запущено скілів:** {sum(1 for v in completed_skills.values() if v[0])} з {len(completed_skills)}\n")
+
+    # Считаем сколько артефактов на диске (не только из текущего запуска)
+    disk_artifacts = sum(1 for f in SKILL_REPORT_FILES.values() if Path(f).exists())
+    md.append(f"**Артефактів на диску:** {disk_artifacts} / {len(SKILL_REPORT_FILES)}\n")
 
     md.append("## 📋 Зведення (executive summary)\n")
 
+    # Хелпер: артефакт включается если файл на диске. Текущий запуск или нет — не важно.
+    def has(skill_name):
+        report_file = SKILL_REPORT_FILES.get(skill_name)
+        return report_file and Path(report_file).exists()
+
     # 1. SEO + контентный аудит
-    if completed_skills.get("audit", (False,))[0] and Path("REPORT.md").exists():
+    if has("audit"):
         md.append("### 🔍 SEO + контентний аудит ([REPORT.md](REPORT.md))\n")
-        # Извлекаем секцию TL;DR через regex или просто берём топ-N
         report_txt = Path("REPORT.md").read_text(encoding="utf-8")
-        # Ищем сводку
         m = re.search(r"## 📊 Сводка\n([\s\S]*?)\n## ", report_txt)
         if m:
             md.append(m.group(1).strip())
@@ -121,7 +145,7 @@ def generate_suite_report(domain, completed_skills, args):
             md.append("")
 
     # 2. Sales report
-    if completed_skills.get("sales", (False,))[0] and Path("SALES_REPORT.md").exists():
+    if has("sales"):
         md.append("### 💰 Продажі + ABC ([SALES_REPORT.md](SALES_REPORT.md))\n")
         sales_txt = Path("SALES_REPORT.md").read_text(encoding="utf-8")
         m = re.search(r"## 📊 Сводка\n([\s\S]*?)\n## ", sales_txt)
@@ -130,17 +154,16 @@ def generate_suite_report(domain, completed_skills, args):
             md.append("")
 
     # 3. Photo audit
-    if completed_skills.get("photo", (False,))[0] and Path("PHOTO_REPORT.md").exists():
+    if has("photo"):
         md.append("### 📸 Аудит фото ([PHOTO_REPORT.md](PHOTO_REPORT.md))\n")
         photo_txt = Path("PHOTO_REPORT.md").read_text(encoding="utf-8")
-        # Знахідки
         m = re.search(r"## 🚨 Знахідки\n([\s\S]*?)\n## ", photo_txt)
         if m:
             md.append(m.group(1).strip())
             md.append("")
 
     # 4. Text quality
-    if completed_skills.get("text", (False,))[0] and Path("TEXT_QUALITY_REPORT.md").exists():
+    if has("text"):
         md.append("### 📝 Якість текстів ([TEXT_QUALITY_REPORT.md](TEXT_QUALITY_REPORT.md))\n")
         text_txt = Path("TEXT_QUALITY_REPORT.md").read_text(encoding="utf-8")
         m = re.search(r"## 📊 Зведення\n([\s\S]*?)\n## ", text_txt)
@@ -149,7 +172,7 @@ def generate_suite_report(domain, completed_skills, args):
             md.append("")
 
     # 5. Consistency
-    if completed_skills.get("consistency", (False,))[0] and Path("CONSISTENCY_REPORT.md").exists():
+    if has("consistency"):
         md.append("### 🔍 Консистентність ([CONSISTENCY_REPORT.md](CONSISTENCY_REPORT.md))\n")
         cons_txt = Path("CONSISTENCY_REPORT.md").read_text(encoding="utf-8")
         m = re.search(r"## 📋 Знахідки\n([\s\S]*?)\n## ", cons_txt)
@@ -160,41 +183,50 @@ def generate_suite_report(domain, completed_skills, args):
             md.append("Конфліктів не знайдено. ✅\n")
 
     # 6. Content gaps
-    if completed_skills.get("gaps", (False,))[0] and Path("gaps.json").exists():
-        gaps = json.loads(Path("gaps.json").read_text(encoding="utf-8"))
-        md.append(f"### 📝 Пропуски в контенті ([gaps.json](gaps.json))\n")
-        md.append(f"Товарів з пустими полями: **{len(gaps)}**.")
-        if gaps:
-            md.append("Запусти `horoshop-content-fill` для масового заповнення.")
-        md.append("")
+    if has("gaps"):
+        try:
+            gaps = json.loads(Path("gaps.json").read_text(encoding="utf-8"))
+            md.append(f"### 📝 Пропуски в контенті ([gaps.json](gaps.json))\n")
+            md.append(f"Товарів з пустими полями: **{len(gaps)}**.")
+            if gaps:
+                md.append("Запусти `horoshop-content-fill` для масового заповнення.")
+            md.append("")
+        except Exception:
+            pass
 
     # 7. Design system
-    if completed_skills.get("design", (False,))[0] and Path("DESIGN_SYSTEM.md").exists():
+    if has("design"):
         md.append("### 🎨 Дизайн-система ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md))\n")
         design_txt = Path("DESIGN_SYSTEM.md").read_text(encoding="utf-8")
         m = re.search(r"## 🎨 Топ-15 цветов[\s\S]*?\n([\s\S]*?)\n## ", design_txt)
         if m:
             md.append("Топ цветов и шрифтов извлечены — см. файл.\n")
+        # Если CSS не нашёлся — design-extract вернул нули. Предупредим.
+        if "Цветов уникальных: 0" in design_txt or "## 🎨 Топ-15 цветов" not in design_txt:
+            md.append("⚠️ **Дизайн-система не извлечена** — публічна головна не дала CSS/HTML "
+                      "(можливо JS-рендер, WAF або lending без зовнішніх стилів). Перевір вручну.\n")
 
-    # ── Статус выполнения ─────────────────────────────────────────
+    # ── Статус виконання ─────────────────────────────────────────
     md.append("## 📦 Статус скілів\n")
-    md.append("| Скіл | Статус | Звіт |")
+    md.append("| Скіл | Останній запуск | Артефакт |")
     md.append("|---|---|---|")
-    skill_files = {
-        "audit": "REPORT.md",
-        "sales": "SALES_REPORT.md",
-        "gaps": "gaps.json",
-        "photo": "PHOTO_REPORT.md",
-        "text": "TEXT_QUALITY_REPORT.md",
-        "consistency": "CONSISTENCY_REPORT.md",
-        "design": "DESIGN_SYSTEM.md",
-    }
-    for name, (ok, status) in completed_skills.items():
-        skill_full = SKILLS[name][0]
-        marker = "✅" if ok else "❌"
-        report = skill_files.get(name, "—")
-        report_link = f"[{report}]({report})" if Path(report).exists() else "—"
-        md.append(f"| `{skill_full}` | {marker} {status} | {report_link} |")
+    for name, full_skill_data in SKILLS.items():
+        skill_full = full_skill_data[0]
+        report = SKILL_REPORT_FILES.get(name, "—")
+        report_exists = Path(report).exists() if report != "—" else False
+        report_link = f"[{report}]({report})" if report_exists else "—"
+
+        # Статус: если в текущем запуске — берём оттуда. Иначе — «з попереднього запуску» если артефакт есть.
+        if name in completed_skills:
+            ok, status = completed_skills[name]
+            marker = "✅" if ok else "❌"
+            run_status = f"{marker} {status} (зараз)"
+        elif report_exists:
+            run_status = "💾 з попереднього запуску"
+        else:
+            run_status = "— не запускався"
+
+        md.append(f"| `{skill_full}` | {run_status} | {report_link} |")
     md.append("")
 
     # ── Брендовый футер ───────────────────────────────────────────
@@ -205,6 +237,46 @@ def generate_suite_report(domain, completed_skills, args):
     return "\n".join(md)
 
 
+def preflight_check_dependencies():
+    """Проверяет что Python-пакеты установлены, чтобы не запускать 7 скиллов с гарантированным провалом."""
+    missing = []
+    for mod in ("requests", "bs4", "lxml"):
+        try:
+            __import__(mod)
+        except ImportError:
+            missing.append(mod)
+    if missing:
+        print(f"\n❌ ERROR: відсутні Python-пакети: {', '.join(missing)}", file=sys.stderr)
+        print("\nВстанови:", file=sys.stderr)
+        print(f"  python3 -m pip install --user --break-system-packages {' '.join(missing)}", file=sys.stderr)
+        print("\nПісля встановлення — повтори запуск.", file=sys.stderr)
+        return False
+    return True
+
+
+def preflight_auth(domain, login, password):
+    """Перевіряє авторизацію перед запуском 7 скилів — щоб не витрачати 5хв на гарантований fail."""
+    import urllib.request
+    import urllib.error
+
+    url = f"https://{domain}/api/auth/"
+    data = json.dumps({"login": login, "password": password}).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            body = json.loads(r.read())
+        if body.get("status") == "OK":
+            return True, "OK"
+        return False, body.get("response", {}).get("message", "невідома помилка")
+    except urllib.error.HTTPError as e:
+        return False, f"HTTP {e.code}"
+    except urllib.error.URLError as e:
+        return False, f"мережа: {e.reason}"
+    except Exception as e:
+        return False, f"помилка: {e}"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Horoshop Suite — orchestrator")
     parser.add_argument("--skip", default="", help="Пропустить скиллы (audit,sales,...)")
@@ -212,6 +284,10 @@ def main():
     parser.add_argument("--from", dest="date_from", default=None, help="Период для sales (YYYY-MM-DD)")
     parser.add_argument("--to", dest="date_to", default=None, help="Период для sales")
     parser.add_argument("--site-url", default=None, help="URL для design-extract")
+    parser.add_argument("--check-sizes", action="store_true",
+                        help="Передать --check-sizes в photo-audit (HEAD-запросы, медленнее)")
+    parser.add_argument("--skip-preflight", action="store_true",
+                        help="Пропустить preflight (auth + deps). По умолчанию выполняется.")
     args = parser.parse_args()
 
     if not all([DOMAIN, LOGIN, PASSWORD]):
@@ -230,13 +306,41 @@ def main():
     print(f"=== Horoshop Suite — {DOMAIN} ===")
     print(f"Скіллов до запуска: {selected}\n")
 
+    # ─── Preflight ──────────────────────────────────────────────────────
+    if not args.skip_preflight:
+        print("[preflight] Перевірка залежностей...")
+        if not preflight_check_dependencies():
+            sys.exit(1)
+        print("  ✓ requests, bs4, lxml встановлено\n")
+
+        print("[preflight] Перевірка auth...")
+        ok, msg = preflight_auth(DOMAIN, LOGIN, PASSWORD)
+        if not ok:
+            print(f"  ❌ Auth fail: {msg}", file=sys.stderr)
+            print(f"  Перевір логін/пароль API-юзера в {DOMAIN}/admin", file=sys.stderr)
+            sys.exit(1)
+        print(f"  ✓ Auth OK на {DOMAIN}\n")
+
     env = os.environ.copy()
     completed = {}
     Path("logs").mkdir(exist_ok=True)
 
-    # Период для sales
-    date_from = args.date_from or (datetime.now().date() - timedelta(days=30)).isoformat()
-    date_to = args.date_to or datetime.now().date().isoformat()
+    # Период для sales — предупреждаем если используется default
+    if args.date_from or args.date_to:
+        date_from = args.date_from or (datetime.now().date() - timedelta(days=30)).isoformat()
+        date_to = args.date_to or datetime.now().date().isoformat()
+    else:
+        date_from = (datetime.now().date() - timedelta(days=30)).isoformat()
+        date_to = datetime.now().date().isoformat()
+        if "sales" in selected:
+            print(f"⚠️  Період sales-report не вказаний — використовую default: {date_from} → {date_to} (30 днів).")
+            print(f"   Для іншого періоду використай --from YYYY-MM-DD --to YYYY-MM-DD\n")
+
+    # photo-audit: предупреждение про size check
+    if "photo" in selected and not args.check_sizes:
+        print("⚠️  photo-audit: --check-sizes ВИМКНЕНО (default).")
+        print("   Скрипт порахує тільки кількість фото, не перевіряючи їх вагу.")
+        print("   Для повного аудиту: передай --check-sizes (повільніше, ~1 HEAD-запит на товар).\n")
 
     site_url = args.site_url or f"https://{DOMAIN}/"
 
@@ -246,12 +350,19 @@ def main():
             ok, status = run_skill(name, [], env, log_path)
         elif name == "sales":
             ok, status = run_skill(name, ["--from", date_from, "--to", date_to], env, log_path)
-        elif name in ("gaps", "photo", "text", "consistency"):
+        elif name in ("gaps", "text", "consistency"):
             cat_path = "catalog.json"
             if Path(cat_path).exists():
                 ok, status = run_skill(name, ["--from-file", cat_path], env, log_path)
             else:
                 ok, status = run_skill(name, [], env, log_path)
+        elif name == "photo":
+            cat_path = "catalog.json"
+            extra = ["--check-sizes"] if args.check_sizes else []
+            if Path(cat_path).exists():
+                ok, status = run_skill(name, ["--from-file", cat_path] + extra, env, log_path)
+            else:
+                ok, status = run_skill(name, extra, env, log_path)
         elif name == "design":
             ok, status = run_skill(name, ["--url", site_url], env, log_path)
         else:
@@ -262,13 +373,33 @@ def main():
     report = generate_suite_report(DOMAIN, completed, args)
     Path("SUITE_REPORT.md").write_text(report, encoding="utf-8")
 
+    # Структурированный статус для постпроцессинга
+    suite_status = {
+        "domain": DOMAIN,
+        "timestamp": datetime.now().isoformat(),
+        "selected": selected,
+        "results": {name: {"ok": ok, "status": status} for name, (ok, status) in completed.items()},
+        "args": {
+            "from": args.date_from,
+            "to": args.date_to,
+            "site_url": args.site_url,
+            "check_sizes": args.check_sizes,
+            "skip": args.skip,
+            "only": args.only,
+        },
+    }
+    Path("suite_status.json").write_text(json.dumps(suite_status, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print(f"\n━━━ TL;DR ━━━")
     ok_count = sum(1 for v in completed.values() if v[0])
     print(f"  Запущено: {ok_count} / {len(completed)} скіллов")
     for name, (ok, status) in completed.items():
         marker = "✓" if ok else "✗"
         print(f"  {marker} {SKILLS[name][0]:30s} {status}")
-    print(f"\nГолова: SUITE_REPORT.md")
+    print(f"\nГолова: SUITE_REPORT.md  ·  суддя: suite_status.json")
+
+    # Exit code: 0 если все ок, 1 если хотя бы один зафейлил
+    sys.exit(0 if ok_count == len(completed) else 1)
 
 
 if __name__ == "__main__":

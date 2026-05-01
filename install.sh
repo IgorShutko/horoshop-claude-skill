@@ -19,11 +19,14 @@ SKILLS=(
   "horoshop-suite"
 )
 
-echo "→ Установка ${#SKILLS[@]} скиллов horoshop-claude-skill..."
+echo "→ Установка ${#SKILLS[@]} скіллов horoshop-claude-skill..."
 
-# Проверка зависимостей
+# Проверка зависимостей системы
 command -v python3 >/dev/null || { echo "ERROR: Python 3 не найден"; exit 1; }
 command -v git >/dev/null || { echo "ERROR: git не найден"; exit 1; }
+
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+echo "  python3 → ${PYTHON_VERSION}"
 
 # Клонируем во временную папку
 TMP=$(mktemp -d)
@@ -47,20 +50,83 @@ for skill in "${SKILLS[@]}"; do
   echo "  ✓ $skill → $dst"
 done
 
+# ─── Установка Python-зависимостей ─────────────────────────────────────────
 echo ""
 echo "→ Установка Python-зависимостей..."
-PIP_FLAGS="--user --quiet"
-# macOS Homebrew Python требует --break-system-packages
+
+# Все нужные пакеты (объединённые requirements всех скиллов)
+PYTHON_DEPS="requests beautifulsoup4 lxml"
+
+# macOS Homebrew Python требует --break-system-packages (PEP 668)
+PIP_FLAGS="--user"
 if python3 -m pip install --help 2>&1 | grep -q break-system-packages; then
   PIP_FLAGS="$PIP_FLAGS --break-system-packages"
 fi
-python3 -m pip install $PIP_FLAGS requests beautifulsoup4 lxml || {
-  echo "WARN: автоматическая установка зависимостей не прошла."
-  echo "      Установи вручную: pip install requests beautifulsoup4 lxml"
-}
 
+if ! python3 -m pip install $PIP_FLAGS $PYTHON_DEPS; then
+  echo ""
+  echo "❌ ERROR: pip install провалился."
+  echo ""
+  echo "Попробуй вручную:"
+  echo "  python3 -m pip install --user --break-system-packages $PYTHON_DEPS"
+  echo ""
+  echo "Или через venv (рекомендую для macOS):"
+  echo "  python3 -m venv ~/.claude/skills/.horoshop-venv"
+  echo "  source ~/.claude/skills/.horoshop-venv/bin/activate"
+  echo "  pip install $PYTHON_DEPS"
+  exit 1
+fi
+
+# ─── Верификация: пакеты реально импортируются ─────────────────────────────
 echo ""
-echo "✅ Установлено ${#SKILLS[@]} скиллов в: $SKILLS_ROOT"
+echo "→ Проверка установки..."
+VERIFY_OUTPUT=$(python3 -c "
+import sys
+errors = []
+try:
+    import requests
+    print(f'  ✓ requests {requests.__version__}')
+except ImportError as e:
+    errors.append(('requests', str(e)))
+try:
+    import bs4
+    print(f'  ✓ beautifulsoup4 {bs4.__version__}')
+except ImportError as e:
+    errors.append(('beautifulsoup4', str(e)))
+try:
+    import lxml
+    print(f'  ✓ lxml {lxml.__version__}')
+except ImportError as e:
+    errors.append(('lxml', str(e)))
+
+if errors:
+    print('ERROR:')
+    for name, err in errors:
+        print(f'  ✗ {name}: {err}')
+    sys.exit(1)
+" 2>&1)
+VERIFY_CODE=$?
+
+echo "$VERIFY_OUTPUT"
+
+if [ $VERIFY_CODE -ne 0 ]; then
+  echo ""
+  echo "❌ Зависимости установились, но не импортируются."
+  echo "   Это может быть mismatch между python3 и pip."
+  echo ""
+  echo "Проверь какой python3 использует Claude Code:"
+  echo "  which python3"
+  echo "  python3 -m pip show requests"
+  echo ""
+  echo "Если установка прошла в другую среду — установи вручную в ту,"
+  echo "которая будет использоваться скиллами."
+  exit 1
+fi
+
+# ─── Финал ─────────────────────────────────────────────────────────────────
+echo ""
+echo "✅ Установлено ${#SKILLS[@]} скіллов в: $SKILLS_ROOT"
+echo "✅ Зависимости проверены: requests, beautifulsoup4, lxml"
 echo ""
 echo "Используй в любом чате Claude Code:"
 echo '  "Полный аудит магазина на хорошопе example.com.ua"      → horoshop-suite'
