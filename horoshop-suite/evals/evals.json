@@ -1,0 +1,10 @@
+{
+  "skill_name": "horoshop-suite",
+  "evals": [
+    {"id": 1, "name": "trigger-full", "prompt": "Полный аудит магазина на хорошопе example.com.ua"},
+    {"id": 2, "name": "trigger-comprehensive", "prompt": "Прогон по всему — SEO, продажи, фото, тексты на shop.ua"},
+    {"id": 3, "name": "trigger-everything", "prompt": "Всё проверь на хорошопе"},
+    {"id": 4, "name": "trigger-monthly", "prompt": "Месячный аудит магазина"},
+    {"id": 5, "name": "should-not-trigger-single", "prompt": "Только проверь фото", "expected": "Это photo-audit"}
+  ]
+}

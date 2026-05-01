@@ -1,0 +1,10 @@
+{
+  "skill_name": "horoshop-text-quality",
+  "evals": [
+    {"id": 1, "name": "trigger-find-typos", "prompt": "Проверь тексты товаров на хорошопе на опечатки"},
+    {"id": 2, "name": "trigger-ai-slop", "prompt": "Найди ChatGPT-тексты в карточках на shop.ua"},
+    {"id": 3, "name": "trigger-quality", "prompt": "Аудит качества описаний товаров на хорошопе"},
+    {"id": 4, "name": "trigger-grammar", "prompt": "Грамматика в карточках товаров — что плохо?"},
+    {"id": 5, "name": "should-not-trigger-content-fill", "prompt": "Заполни пустые описания товаров", "expected": "Это content-fill, не text-quality"}
+  ]
+}

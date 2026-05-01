@@ -1,0 +1,10 @@
+{
+  "skill_name": "horoshop-photo-audit",
+  "evals": [
+    {"id": 1, "name": "trigger-photo-count", "prompt": "Сколько у меня фото на каждый товар на хорошопе?"},
+    {"id": 2, "name": "trigger-find-photoless", "prompt": "Найди товары без фото на shop.com.ua"},
+    {"id": 3, "name": "trigger-photo-sizes", "prompt": "Проверь размеры фото товаров на хорошопе, нет ли тяжёлых"},
+    {"id": 4, "name": "trigger-duplicates", "prompt": "Есть ли дубли главных фото между товарами на горошопе"},
+    {"id": 5, "name": "should-not-trigger-content-fill", "prompt": "Заполни описания товаров", "expected": "Это content-fill, не photo-audit"}
+  ]
+}

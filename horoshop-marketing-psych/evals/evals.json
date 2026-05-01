@@ -1,0 +1,9 @@
+{
+  "skill_name": "horoshop-marketing-psych",
+  "evals": [
+    {"id": 1, "name": "trigger-psych", "prompt": "Добавь маркетинг-приёмы в карточки товаров на хорошопе"},
+    {"id": 2, "name": "trigger-scarcity", "prompt": "Добавь scarcity и social proof в топ товары shop.ua"},
+    {"id": 3, "name": "trigger-conversion", "prompt": "Переписать описания товаров продающим стилем"},
+    {"id": 4, "name": "should-not-trigger-content-fill", "prompt": "Заполни пустые описания", "expected": "Это content-fill"}
+  ]
+}

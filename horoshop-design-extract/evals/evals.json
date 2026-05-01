@@ -1,0 +1,10 @@
+{
+  "skill_name": "horoshop-design-extract",
+  "evals": [
+    {"id": 1, "name": "trigger-extract-design", "prompt": "Выгрузи дизайн-систему с моего магазина на хорошопе example.com.ua"},
+    {"id": 2, "name": "trigger-brand-colors", "prompt": "Получи цвета бренда с сайта shop.com.ua"},
+    {"id": 3, "name": "trigger-logo", "prompt": "Скачай логотип магазина mystore.com.ua"},
+    {"id": 4, "name": "trigger-fonts", "prompt": "Какие шрифты используются на example.horoshop.ua?"},
+    {"id": 5, "name": "should-not-trigger-photo", "prompt": "Аудит фото товаров", "expected": "Это photo-audit"}
+  ]
+}

@@ -1,6 +1,6 @@
-# Horoshop Full Audit — Claude Code Skill
+# Horoshop Claude Skills — toolkit for Horoshop stores
 
-> 🛠 A Claude Code skill that runs a full SEO audit on stores built on the [Horoshop](https://horoshop.ua/) e-commerce platform via API + public-page parsing, generates a structured report, and applies fixes through the API after confirmation.
+> 🛠 A set of Claude Code skills: SEO audit, sales reports, ABC analysis, product card filling, and other operations for stores on the [Horoshop](https://horoshop.ua/) e-commerce platform via API.
 
 🌐 [Русский](README.md) · [Українська](README.uk.md) · [English](README.en.md)
 
@@ -19,11 +19,29 @@ Performance marketing for e-commerce and local business from Dnipro, Ukraine.
 
 📺 **TG channel [@shutko_ads](https://t.me/shutko_ads)** — about ads, analytics, real-world cases.
 
-This skill is an open-source tool we use ourselves on e-commerce clients running on Horoshop. We're sharing because the platform and contractors should both work clean.
+These skills are open-source tools we use ourselves on e-commerce clients running on Horoshop. We're sharing because the platform and contractors should both work clean.
 
 ---
 
-## What it does
+## 📦 Skills in this repo
+
+9 independent skills + 1 meta-orchestrator. Installed together, triggered by phrases in chat.
+
+| Skill | What it does | Trigger |
+|---|---|---|
+| **[`horoshop-suite`](horoshop-suite/)** | 🎁 **Meta-orchestrator**: runs all other skills sequentially and assembles a single `SUITE_REPORT.md` with executive summary | "full audit", "comprehensive check", "run everything" |
+| **[`horoshop-full-audit`](horoshop-full-audit/)** | Full SEO + content audit: 22 checks, 10 automated API fixes | "audit my store", "check horoshop store" |
+| **[`horoshop-sales-report`](horoshop-sales-report/)** | Sales report: daily/weekly/monthly trends, ABC analysis (Pareto 80/15/5), UTM and payment/delivery breakdowns | "sales report", "ABC analysis", "average order value" |
+| **[`horoshop-content-fill`](horoshop-content-fill/)** | Find products with empty `description`/`short_description`/`marketplace_description` + brand-aware generation + API import with preview | "fill empty descriptions", "write marketplace description" |
+| **[`horoshop-photo-audit`](horoshop-photo-audit/)** | Photo audit: products with <N photos, duplicate main images, optional file size via HEAD requests | "check product photos", "image audit" |
+| **[`horoshop-text-quality`](horoshop-text-quality/)** | Text quality: AI-slop, marketing fluff, repeated words, CAPS LOCK, long sentences | "find ChatGPT-generated text", "check description quality" |
+| **[`horoshop-consistency`](horoshop-consistency/)** | Conflicts between text and characteristics: material/country/color/size mismatches | "contradictions in cards", "characteristics don't match" |
+| **[`horoshop-design-extract`](horoshop-design-extract/)** | Design system from public homepage: colors, fonts, CSS variables, logo, favicon | "extract brand style", "store design system" |
+| **[`horoshop-marketing-psych`](horoshop-marketing-psych/)** | Strengthen product cards with psychological techniques (scarcity, anchoring, social proof, loss aversion) with preview and import | "marketing tricks for cards", "selling style" |
+
+---
+
+## What `horoshop-full-audit` does
 
 **🟢 Auto-fixable via API (10 batch fixes):**
 - Resets expired sale countdown timers (`countdown_end_time`)
@@ -65,24 +83,26 @@ The skill exports the catalog + categories via API, parses public pages, then ge
 
 ## Installation
 
-### Option 1 — one-liner (recommended)
+### Option 1 — one-liner (all 9 skills at once)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IgorShutko/horoshop-claude-skill/main/install.sh | bash
 ```
 
-### Option 2 — `.skill` file
+Installs all 9 skills into `~/.claude/skills/horoshop-*` + Python deps.
 
-Download `horoshop-full-audit.skill` from the [latest release](https://github.com/IgorShutko/horoshop-claude-skill/releases) and double-click — Claude Code installs it automatically.
-
-### Option 3 — manual
+### Option 2 — manual, selective
 
 ```bash
 git clone https://github.com/IgorShutko/horoshop-claude-skill.git
 cd horoshop-claude-skill
+
+# Install one skill (e.g. full-audit)
 mkdir -p ~/.claude/skills/horoshop-full-audit
-cp -r SKILL.md scripts references evals ~/.claude/skills/horoshop-full-audit/
+cp -r horoshop-full-audit/* ~/.claude/skills/horoshop-full-audit/
 chmod +x ~/.claude/skills/horoshop-full-audit/scripts/*.py
+
+# Dependencies
 pip install --user requests beautifulsoup4 lxml
 ```
 
@@ -90,17 +110,25 @@ pip install --user requests beautifulsoup4 lxml
 
 ## Usage
 
-After installation, in any Claude Code chat write:
+After installation, in any Claude Code chat write what you need:
 
-```
-Run a full audit of my Horoshop store at example.com.ua
-```
+| What I want | Trigger |
+|---|---|
+| Run all skills at once | `Full audit of my Horoshop store at example.com.ua` |
+| SEO + content audit only | `Run audit of my Horoshop store at example.com.ua` |
+| Sales + ABC | `Sales report for the past month` |
+| Fill empty descriptions | `Fill empty product descriptions` |
+| Photo audit | `Check product photos` |
+| Text quality | `Find ChatGPT-generated text in cards` |
+| Consistency | `Check characteristics for contradictions` |
+| Design system | `Extract brand style from homepage` |
+| Marketing tricks | `Add marketing techniques to top products` |
 
 Claude will:
 1. Ask for credentials (or show instructions for creating an API user)
-2. Run the full audit — export catalog, categories, parse public pages
-3. Generate `REPORT.md` with the three-section breakdown
-4. Ask for confirmation on each of the 10 API fixes
+2. Run the requested skill (or all of them — if `suite` was triggered)
+3. Generate the report with the three-section breakdown
+4. Ask for confirmation before applying fixes
 5. Apply the selected fixes via batch import (with preview for content-touching ones)
 
 ---
@@ -135,20 +163,28 @@ If you'd rather not DIY, or need more than just a technical audit — **Target+ 
 ## Repository structure
 
 ```
-horoshop-full-audit/
-├── SKILL.md                       # Main skill file with pipeline
-├── scripts/
-│   ├── audit.py                   # Orchestrator: catalog + HTML + report
-│   └── apply_fixes.py             # 10 API fixes with --dry-run
-├── references/
-│   ├── api_admin_setup.md         # API user setup guide
-│   ├── api_quickref.md            # Horoshop API reference
-│   ├── audit_checklist.md         # 22 checks with rationale
-│   └── fix_recipes.md             # Recipes for each fix
-├── examples/
-│   └── sample-REPORT.md           # Sample output
-└── evals/
-    └── evals.json                 # Test cases for skill triggering
+horoshop-claude-skill/
+├── horoshop-suite/             # 🎁 meta-orchestrator (runs other skills)
+├── horoshop-full-audit/        # SEO + content audit
+├── horoshop-sales-report/      # sales + ABC + UTM
+├── horoshop-content-fill/      # fill empty fields
+├── horoshop-photo-audit/       # photo audit
+├── horoshop-text-quality/      # text quality / AI-slop
+├── horoshop-consistency/       # text ↔ characteristics conflicts
+├── horoshop-design-extract/    # brand style from public homepage
+├── horoshop-marketing-psych/   # psych techniques for conversion
+├── install.sh                  # Installs all 9 skills
+├── README.md / README.uk.md / README.en.md
+└── LICENSE
+```
+
+Each skill is a self-contained folder with the same structure:
+```
+horoshop-<skill>/
+├── SKILL.md         # Triggers + pipeline
+├── scripts/         # Python scripts
+├── references/      # Reference docs, recipes, checklists
+└── evals/           # Test cases for triggering
 ```
 
 ## Principles

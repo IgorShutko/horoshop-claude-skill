@@ -1,6 +1,6 @@
-# Horoshop Full Audit — Claude Code Skill
+# Horoshop Claude Skills — набір інструментів для магазинів на Хорошопі
 
-> 🛠 Скіл для Claude Code, який робить повний SEO-аудит магазинів на платформі [Хорошоп](https://horoshop.ua/) через API + парсинг публічних сторінок, формує структурований звіт та застосовує виправлення через API після підтвердження.
+> 🛠 Набір скілів для Claude Code: SEO-аудит, звіти з продажів, ABC-аналіз, заповнення карток товарів та інші операції для магазинів на платформі [Хорошоп](https://horoshop.ua/) через API.
 
 🌐 [Русский](README.md) · [Українська](README.uk.md) · [English](README.en.md)
 
@@ -19,11 +19,29 @@ Performance-маркетинг для e-commerce та локального бі�
 
 📺 **TG-канал [@shutko_ads](https://t.me/shutko_ads)** — про рекламу, аналітику та реальні кейси з агенції.
 
-Цей скіл — open-source інструмент, яким ми самі користуємося при роботі з e-commerce клієнтами на Хорошопі. Ділимося, бо краще коли платформа та підрядники працюють чисто.
+Ці скіли — open-source інструменти, якими ми самі користуємося при роботі з e-commerce клієнтами на Хорошопі. Ділимося, бо краще коли платформа та підрядники працюють чисто.
 
 ---
 
-## Що вміє
+## 📦 Скіли в цьому репо
+
+9 незалежних скілів + 1 мета-оркестратор. Встановлюються разом, працюють за тригерами в чаті.
+
+| Скіл | Що робить | Тригер |
+|---|---|---|
+| **[`horoshop-suite`](horoshop-suite/)** | 🎁 **Мета-оркестратор**: запускає всі інші скіли по черзі та збирає єдиний `SUITE_REPORT.md` з executive summary | «повний аудит», «прогін по всьому», «все перевір» |
+| **[`horoshop-full-audit`](horoshop-full-audit/)** | Повний SEO + контентний аудит: 22 перевірки, 10 автоматичних API-фіксів | «зроби аудит магазину», «перевір horoshop магазин» |
+| **[`horoshop-sales-report`](horoshop-sales-report/)** | Звіт з продажів, динаміка по днях/тижнях/місяцях, ABC-аналіз (Парето 80/15/5), розрізи по UTM, способах оплати/доставки | «звіт з продажів», «ABC-аналіз», «середній чек» |
+| **[`horoshop-content-fill`](horoshop-content-fill/)** | Пошук товарів з порожніми `description`/`short_description`/`marketplace_description` + генерація під бренд + імпорт через API з прев'ю | «заповни описи», «прописати marketplace description» |
+| **[`horoshop-photo-audit`](horoshop-photo-audit/)** | Аудит фото: товари з <N фото, дублі головних зображень, опціонально розмір файлів через HEAD-запити | «перевір фото в картках», «аудит зображень» |
+| **[`horoshop-text-quality`](horoshop-text-quality/)** | Якість текстів: AI-слоп, маркетингова вода, повтори слів, CAPS LOCK, довгі речення | «знайди ChatGPT-тексти», «перевір якість описів» |
+| **[`horoshop-consistency`](horoshop-consistency/)** | Конфлікти між текстом і характеристиками: матеріал/країна/колір/розмір не збігаються | «суперечності в картках», «характеристики не сходяться» |
+| **[`horoshop-design-extract`](horoshop-design-extract/)** | Дизайн-система з публічної головної: кольори, шрифти, CSS-змінні, логотип, favicon | «вивантаж бренд-стиль», «дизайн-система магазину» |
+| **[`horoshop-marketing-psych`](horoshop-marketing-psych/)** | Підсилення карток психологічними прийомами (scarcity, anchoring, social proof, loss aversion) з прев'ю та імпортом | «маркетинг-прийоми в картки», «продаючий стиль» |
+
+---
+
+## Що вміє `horoshop-full-audit`
 
 **🟢 Виправляє через API (10 пакетних фіксів):**
 - Обнуляє минулі таймери акцій (`countdown_end_time`)
@@ -65,24 +83,26 @@ Performance-маркетинг для e-commerce та локального бі�
 
 ## Встановлення
 
-### Варіант 1 — однією командою (рекомендую)
+### Варіант 1 — однією командою (всі 9 скілів одразу)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IgorShutko/horoshop-claude-skill/main/install.sh | bash
 ```
 
-### Варіант 2 — `.skill` файлом
+Встановить усі 9 скілів у `~/.claude/skills/horoshop-*` + Python-залежності.
 
-Завантаж `horoshop-full-audit.skill` з [останнього релізу](https://github.com/IgorShutko/horoshop-claude-skill/releases) і двічі клікни — Claude Code встановить автоматично.
-
-### Варіант 3 — вручну
+### Варіант 2 — вручну, вибірково
 
 ```bash
 git clone https://github.com/IgorShutko/horoshop-claude-skill.git
 cd horoshop-claude-skill
+
+# Встановлення одного скіла (наприклад, full-audit)
 mkdir -p ~/.claude/skills/horoshop-full-audit
-cp -r SKILL.md scripts references evals ~/.claude/skills/horoshop-full-audit/
+cp -r horoshop-full-audit/* ~/.claude/skills/horoshop-full-audit/
 chmod +x ~/.claude/skills/horoshop-full-audit/scripts/*.py
+
+# Залежності
 pip install --user requests beautifulsoup4 lxml
 ```
 
@@ -90,17 +110,25 @@ pip install --user requests beautifulsoup4 lxml
 
 ## Використання
 
-Після встановлення у будь-якому чаті Claude Code напиши:
+Після встановлення у будь-якому чаті Claude Code напиши те, що треба:
 
-```
-Зроби аудит магазину на хорошопі example.com.ua
-```
+| Що хочу | Тригер |
+|---|---|
+| Прогін по всіх напрямках одразу | `Повний аудит магазину на хорошопі example.com.ua` |
+| Тільки SEO + контентний аудит | `Зроби аудит магазину на хорошопі example.com.ua` |
+| Продажі + ABC | `Звіт з продажів за місяць` |
+| Заповнити порожні описи | `Заповни порожні описи товарів` |
+| Аудит фото | `Перевір фото в картках` |
+| Перевірити тексти | `Знайди ChatGPT-тексти в картках` |
+| Суперечності | `Перевір характеристики на суперечності` |
+| Дизайн-система | `Вивантаж бренд-стиль з головної` |
+| Маркетинг-прийоми | `Додай маркетинг-прийоми в топ-товари` |
 
 Claude:
 1. Спитає креди (або видасть інструкцію як створити API-юзера)
-2. Прожене повний аудит — вивантажить каталог, категорії, спарсить публічні сторінки
-3. Сформує `REPORT.md` з поділом «через API» / «в адмінці» / «вже добре»
-4. Спитає підтвердження по кожному з 10 API-фіксів
+2. Прожене вибраний скіл (або всі — якщо просили `suite`)
+3. Сформує звіт з поділом «через API» / «в адмінці» / «вже добре»
+4. Спитає підтвердження перед застосуванням фіксів
 5. Застосує вибрані пакетним імпортом (для контентних — з прев'ю)
 
 ---
@@ -135,20 +163,28 @@ Claude:
 ## Структура
 
 ```
-horoshop-full-audit/
-├── SKILL.md                       # Головний файл скіла з pipeline
-├── scripts/
-│   ├── audit.py                   # Оркестратор: каталог + HTML + report
-│   └── apply_fixes.py             # 10 API-фіксів з --dry-run
-├── references/
-│   ├── api_admin_setup.md         # Інструкція створити API-юзера
-│   ├── api_quickref.md            # Довідник Horoshop API
-│   ├── audit_checklist.md         # 22 перевірки з обґрунтуваннями
-│   └── fix_recipes.md             # Рецепти кожного фіксу
-├── examples/
-│   └── sample-REPORT.md           # Приклад вихідного звіту
-└── evals/
-    └── evals.json                 # Test cases для тригеру скіла
+horoshop-claude-skill/
+├── horoshop-suite/             # 🎁 мета-оркестратор (запускає інші)
+├── horoshop-full-audit/        # SEO + контентний аудит
+├── horoshop-sales-report/      # продажі + ABC + UTM
+├── horoshop-content-fill/      # заповнення порожніх полів
+├── horoshop-photo-audit/       # аудит фото
+├── horoshop-text-quality/      # якість текстів / AI-слоп
+├── horoshop-consistency/       # суперечності текст ↔ характеристики
+├── horoshop-design-extract/    # бренд-стиль з публічної головної
+├── horoshop-marketing-psych/   # психо-прийоми для конверсії
+├── install.sh                  # Встановлює всі 9 скілів
+├── README.md / README.uk.md / README.en.md
+└── LICENSE
+```
+
+Кожен скіл — незалежна папка з однаковою структурою:
+```
+horoshop-<skill>/
+├── SKILL.md         # Тригери + pipeline
+├── scripts/         # Python-скрипти
+├── references/      # Довідники, рецепти, чеклісти
+└── evals/           # Test cases для тригеру
 ```
 
 ## Принципи

@@ -27,3 +27,36 @@ gaps.json
 proposed_content.json
 fix_content_*.json
 content_*/
+
+# Артефакты photo-audit
+PHOTO_REPORT.md
+photo_audit.json
+photo_*/
+
+# Артефакты text-quality
+TEXT_QUALITY_REPORT.md
+text_quality.json
+text_*/
+
+# Артефакты consistency
+CONSISTENCY_REPORT.md
+consistency.json
+consistency_*/
+
+# Артефакты design-extract (логотипы — собственность клиента)
+DESIGN_SYSTEM.md
+design.json
+design_*/
+assets/logo.*
+assets/favicon.*
+
+# Артефакты marketing-psych
+targets.json
+proposed_psych.json
+fix_psych_*.json
+psych_*/
+
+# Артефакты suite (мета-оркестратор)
+SUITE_REPORT.md
+suite_*/
+logs/

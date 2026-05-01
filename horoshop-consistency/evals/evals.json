@@ -1,0 +1,9 @@
+{
+  "skill_name": "horoshop-consistency",
+  "evals": [
+    {"id": 1, "name": "trigger-conflicts", "prompt": "Найди несоответствия в карточках товаров на хорошопе"},
+    {"id": 2, "name": "trigger-mismatch", "prompt": "Проверь что описания соответствуют характеристикам shop.com.ua"},
+    {"id": 3, "name": "trigger-bugs", "prompt": "Найди баги в товарах хорошоп где материал в тексте не совпадает с характеристиками"},
+    {"id": 4, "name": "should-not-trigger-text-quality", "prompt": "Найди опечатки", "expected": "Это text-quality"}
+  ]
+}
