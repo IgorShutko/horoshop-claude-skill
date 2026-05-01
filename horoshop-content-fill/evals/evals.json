@@ -1,0 +1,35 @@
+{
+  "skill_name": "horoshop-content-fill",
+  "evals": [
+    {
+      "id": 1,
+      "name": "trigger-fill-empty-descriptions",
+      "prompt": "Заполни пустые описания товаров на хорошоп магазине mystore.com.ua",
+      "expected_output": "Skill triggers; asks for credentials + brand context; runs find_gaps.py; describes how Claude will generate content; awaits approval before apply."
+    },
+    {
+      "id": 2,
+      "name": "trigger-marketplace-feed",
+      "prompt": "Прописать marketplace_description для всех товаров на хорошопе чтобы Google Shopping не отклонял",
+      "expected_output": "Skill triggers with --fields marketplace_description focus; finds gaps; generates 50-150 char snippets; previews."
+    },
+    {
+      "id": 3,
+      "name": "trigger-short-description",
+      "prompt": "У меня short description пустые на хорошопе, дополни",
+      "expected_output": "Skill triggers; finds products with empty short_description; generates 100-200 char text from characteristics."
+    },
+    {
+      "id": 4,
+      "name": "should-not-trigger-seo-meta",
+      "prompt": "Заполни пустые seo_title на хорошопе",
+      "expected_output": "Skill does NOT trigger — это в horoshop-full-audit (--fix seo). Должен сработать full-audit или Claude должен направить туда."
+    },
+    {
+      "id": 5,
+      "name": "trigger-bulk-content",
+      "prompt": "Сгенерируй описания для всех товаров с пустыми полями на shop.com.ua",
+      "expected_output": "Skill triggers; runs find_gaps; if found — proceeds. Если ничего не пусто — сообщает «нет товаров с пустыми полями» и предлагает full-audit или другие скиллы."
+    }
+  ]
+}

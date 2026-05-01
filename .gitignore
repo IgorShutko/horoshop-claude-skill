@@ -21,3 +21,9 @@ orders.json
 SALES_REPORT.md
 abc.csv
 sales_*/
+
+# Артефакты content-fill (содержат каталог + сгенерированный контент)
+gaps.json
+proposed_content.json
+fix_content_*.json
+content_*/
