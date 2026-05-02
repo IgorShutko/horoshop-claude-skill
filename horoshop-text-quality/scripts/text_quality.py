@@ -504,12 +504,27 @@ def generate_report(findings, total_main):
     md.append(f"| Аутентичність | Звучить як людина? | **{authenticity}/10** |")
     md.append(f"| Щільність | Чи є що вирізати? | **{density}/10** |")
     md.append(f"\n**Загалом: {total}/50**")
-    if total < 35:
-        md.append("\n🔴 Менше 35/50 — описи потребують переписування.")
-    elif total < 42:
-        md.append("\n🟡 Робота над помилками — описи стерпні, але є куди ростити.")
+
+    # Вердикт учитывает ТРИ фактора:
+    # 1) total score
+    # 2) affected_pct (% товаров с проблемами)
+    # 3) min(dimensions) — если хоть одно измерение в красной зоне (≤3), это всегда проседание
+    min_dim = min(directness, rhythm, trust, authenticity, density)
+    if affected_pct >= 80 or min_dim <= 3 or total < 35:
+        md.append(
+            f"\n🔴 **Критично:** {affected_pct:.0f}% товарів мають проблеми, "
+            f"мінімальний вимір — {min_dim}/10. Описи потребують переписування."
+        )
+    elif affected_pct >= 50 or min_dim <= 5 or total < 42:
+        md.append(
+            f"\n🟡 **Робота над помилками:** {affected_pct:.0f}% товарів зачеплено, "
+            f"мінімальний вимір — {min_dim}/10. Описи стерпні, але є куди ростити."
+        )
     else:
-        md.append("\n🟢 Описи на високому рівні. Підтримуй стандарт.")
+        md.append(
+            f"\n🟢 **Високий рівень:** {affected_pct:.0f}% з проблемами, "
+            f"мінімальний вимір — {min_dim}/10. Підтримуй стандарт."
+        )
     md.append("")
 
     md.append("\n## 💡 Що з цим робити\n")

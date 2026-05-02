@@ -774,67 +774,68 @@ def generate_report(products, categories, html, audit_data):
 
     # ── API fixes section ──────────────────────────────────────
     md.append("## 🟢 Що виправляється через API\n")
+    # (заголовки без хардкод-нумерації — нумерація проставляється динамически по факту наявності)
     fixes = []
 
     if n("countdown_expired"):
         fixes.append((
-            f"### 1. Минулі акції (`countdown_end_time`) — {n('countdown_expired')} товарів",
+            f"Минулі акції (`countdown_end_time`) — {n('countdown_expired')} товарів",
             "На сторінці товара показується мертвий таймер або від'ємні значення. Підриває довіру.",
             "Запустити `apply_fixes.py --fix countdown` — обнулить дату або продовжити."
         ))
     if n("mod_title_empty"):
         fixes.append((
-            f"### 2. Порожній `mod_title` — {n('mod_title_empty')} модифікацій",
+            f"Порожній `mod_title` — {n('mod_title_empty')} модифікацій",
             "У селекторі модифікацій користувач не бачить осмисленого імені (Двоспальний, Євро тощо).",
             "Запустити `apply_fixes.py --fix mod-title` — заповнить з ключової характеристики (rozmr/розмір)."
         ))
     if n("discount_unmarked"):
         fixes.append((
-            f"### 3. `discount=0` при реальній знижці — {n('discount_unmarked')} товарів",
+            f"`discount=0` при реальній знижці — {n('discount_unmarked')} товарів",
             "Хорошоп показує стікер -X% на основі поля `discount`. Якщо 0 — стікер прихований.",
             "`apply_fixes.py --fix discount` — порахує `(old-price)/old*100` і запише."
         ))
     if n("seo_title_empty") + n("seo_description_empty") + n("h1_empty") > 0:
         cnt = max(n("seo_title_empty"), n("seo_description_empty"), n("h1_empty"))
         fixes.append((
-            f"### 4. Порожні SEO-поля — до {cnt} товарів",
+            f"Порожні SEO-поля — до {cnt} товарів",
             "SEO-шаблон дає дефолт, але унікальні мета-теги дають контроль над сніпетом і вищий CTR.",
             "`apply_fixes.py --fix seo --preview-only` → переглянути → `--fix seo` записати."
         ))
     if n("mpn_missing"):
         fixes.append((
-            f"### 5. Відсутній MPN — {n('mpn_missing')} товарів",
+            f"Відсутній MPN — {n('mpn_missing')} товарів",
             "Google Shopping/Rozetka/Facebook фіди вимагають MPN або GTIN. Без них модерація відхиляє.",
             "`apply_fixes.py --fix mpn --prefix XX` — генерує `XX-{article}` для всіх."
         ))
     if n("dup_description"):
         fixes.append((
-            f"### 6. Дублікати description — {n('dup_description')} груп",
+            f"Дублікати description — {n('dup_description')} груп",
             "Google пеналізує дублі канонікалізацією → одна сторінка в індексі, інші втрачаються.",
             "`apply_fixes.py --fix dup-desc` — переписує під унікальні характеристики (превью обов'язкове)."
         ))
     if n("installments_disabled"):
         fixes.append((
-            f"### 7. Оплата частинами вимкнена — {n('installments_disabled')} товарів",
+            f"Оплата частинами вимкнена — {n('installments_disabled')} товарів",
             "Для середнього чека ≥500 грн розстрочка — стандартний канал конверсії в UA.",
             "`apply_fixes.py --fix installments` — увімкне Privat + Monobank."
         ))
     if n("no_sale_sticker"):
         fixes.append((
-            f"### 8. Стікер «Распродажа» відсутній — {n('no_sale_sticker')} товарів зі знижкою",
+            f"Стікер «Распродажа» відсутній — {n('no_sale_sticker')} товарів зі знижкою",
             "Стікер — головний візуальний CTA в каталозі. Без нього скидка менш помітна.",
             "`apply_fixes.py --fix sticker-sale --sticker-name Распродажа` — додасть в `icons[]`."
         ))
     desc_quality_inline = sum(1 for x in f.get("description_quality", []) if "inline-стилей" in x.get("issues", ""))
     if desc_quality_inline:
         fixes.append((
-            f"### 9. Inline-стилі в описах — {desc_quality_inline} товарів",
+            f"Inline-стилі в описах — {desc_quality_inline} товарів",
             "HTML захаращений `style=\"...\"` атрибутами. Не критично, але сповільнює рендер і конфліктує з темою.",
             "`apply_fixes.py --fix inline-styles --preview-only` → переглянути → запустити без `--preview-only`."
         ))
     if n("no_accessories") + n("no_alt_parent") > 5:
         fixes.append((
-            f"### 10. Cross-sell не налаштовано — accessories/alt_parent у {n('no_accessories')} товарів",
+            f"Cross-sell не налаштовано — accessories/alt_parent у {n('no_accessories')} товарів",
             "Втрачений AOV (без блоку «з цим товаром купують») і внутрішня перелінковка (без альтернативних розділів типу «Хіти»).",
             "`apply_fixes.py --fix cross-sell --interactive` — потрібне обговорення стратегії що до чого прив'язувати."
         ))
@@ -842,8 +843,9 @@ def generate_report(products, categories, html, audit_data):
     if not fixes:
         md.append("Жодних API-фіксів не потрібно — каталог чистий. ✅\n")
     else:
-        for title, why, how in fixes:
-            md.append(f"\n{title}\n")
+        # Нумерация ставится по факту, без пропусков
+        for idx, (title, why, how) in enumerate(fixes, 1):
+            md.append(f"\n### {idx}. {title}\n")
             md.append(f"**Чому важливо:** {why}\n")
             md.append(f"**Як виправити:** {how}\n")
 
@@ -984,7 +986,7 @@ def generate_report(products, categories, html, audit_data):
         "mpn_missing": ("Відсутній MPN", "🟢 fix через API: `mpn`"),
         "duplicate_descriptions": ("Дублі описів між товарами", "🟢 fix через API: `dup-desc`"),
         "installments_disabled": ("Вимкнена «Оплата частинами»", "🟢 fix через API: `installments`"),
-        "no_sale_sticker": ("Знижка є, стикера «Распродаж» нема", "🟢 fix через API: `sticker-sale`"),
+        "no_sale_sticker": ("Знижка є, стикера «Распродажа» нема", "🟢 fix через API: `sticker-sale`"),
         "inline_styles_in_desc": ("Inline-стилі в HTML описів", "🟢 fix через API: `inline-styles`"),
         "no_accessories": ("Немає cross-sell аксесуарів", "🟢 fix через API: `cross-sell`"),
         "no_alt_parent": ("Немає альтернативних категорій", "🟡 в адмінці: Каталог → Категорії"),
@@ -1001,6 +1003,18 @@ def generate_report(products, categories, html, audit_data):
         "homepage_no_h1": ("На головній немає `<h1>`", "🟡 в адмінці: Сайт → Дизайн → Редактор"),
         "h1_duplicates": ("Дублі `<h1>` на сторінці", "🟡 в адмінці: Сайт → Дизайн → Редактор"),
         "category_no_seotext": ("Категорія без SEO-тексту", "🟡 в адмінці: Каталог → Категорія → SEO-текст"),
+        # Раніше відсутні в finding_meta (виявлено двома прогонами на реальних магазинах):
+        "description_quality": ("Слабкий description (короткий/без структури/inline-стилі)", "🟢 fix через `horoshop-content-fill` або вручну"),
+        "single_image": ("Тільки 1 фото", "🟡 додати фото в адмінці або через `horoshop-photo-audit`"),
+        "title_empty": ("Порожній title", "🟢 fix через API: `seo` або вручну"),
+        "title_quality": ("Слабкий title (короткий/без ключів)", "🟡 переписати вручну"),
+        "brand_empty": ("Порожній бренд", "🟡 в адмінці: Каталог → Товари → Бренд"),
+        "dup_title": ("Дублі title між товарами", "🟢 переписати унікально через `horoshop-content-fill`"),
+        "dup_description": ("Дублі description між товарами", "🟢 fix через API: `dup-desc`"),
+        "dup_seo_title": ("Дублі SEO-title", "🟢 переписати через API"),
+        "dup_seo_description": ("Дублі SEO-description", "🟢 переписати через API"),
+        "dup_h1": ("Дублі h1_title", "🟢 переписати через API"),
+        "seo_description_long": ("SEO-description довший за 160 символів", "🟢 скоротити через API: `seo`"),
     }
 
     md.append("| # | Знахідка | Кількість | Як чинити |")

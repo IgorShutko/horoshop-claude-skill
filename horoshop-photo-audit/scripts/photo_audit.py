@@ -258,12 +258,27 @@ def generate_report(findings, photo_counts, total_main, args):
         md.append("")
 
     md.append("## 💡 Рекомендації\n")
-    if n("no_photos") > 0 or n("only_one_photo") > 0:
-        md.append(f"- 📸 Доснять {n('only_one_photo') + n('no_photos')} товарів. Стандарт: 4-7 фото з ракурсів + контекст використання + деталь")
+    recs = []
+    if n("no_photos") > 0:
+        recs.append(f"- 🔴 **Доснять {n('no_photos')} товарів без фото** — без головного фото товар невидимий в листингу.")
+    if n("only_one_photo") > 0:
+        recs.append(f"- 📸 **Доснять {n('only_one_photo')} товарів з 1 фото** — конверсія в 2-3× нижче. Стандарт: 4-7 фото з ракурсів + контекст використання + деталь.")
+    if n("below_min_photos") > 0:
+        recs.append(f"- 📸 **Дозняти {n('below_min_photos')} товарів** — менше {args.min_photos} фото. Стандарт e-commerce: 4-7 фото.")
     if n("main_image_duplicates") > 0:
-        md.append("- 🔄 Замінити дублікати головних фото — кожен товар має свою першу картинку")
+        recs.append(f"- 🔄 **Замінити {n('main_image_duplicates')} груп дублікатів головних фото** — кожен товар має свою першу картинку. Часто це баг імпорту з CSV.")
     if n("heavy_image") > 0:
-        md.append(f"- 🗜 Стиснути {n('heavy_image')} картинок до <{args.max_size_kb} КБ (через TinyPNG, Squoosh або Photoshop «Save for Web»)")
+        recs.append(f"- 🗜 **Стиснути {n('heavy_image')} картинок** до <{args.max_size_kb} КБ (через TinyPNG, Squoosh або Photoshop «Save for Web»). Впливає на LCP / Core Web Vitals.")
+    if n("bad_image_status") > 0:
+        recs.append(f"- 🔴 **Перевірити {n('bad_image_status')} битих URL фото** — товар не відображається на сайті.")
+
+    if not args.check_sizes:
+        recs.append(f"- ℹ️ Перевірка ваги фото вимкнена (default). Запусти з `--check-sizes` для повного аудиту (HEAD-запит на кожне головне фото).")
+
+    if recs:
+        md.extend(recs)
+    else:
+        md.append("Каталог фото в порядку. ✅ Усі товари мають достатньо фото, дублів і битих URL не знайдено.")
 
     md.append("\n---\n")
     md.append("📸 *Згенеровано скілом [horoshop-photo-audit](https://github.com/IgorShutko/horoshop-claude-skill) — Target+ Agency.*  ")

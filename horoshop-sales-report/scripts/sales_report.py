@@ -152,6 +152,7 @@ def overall_stats(orders):
         "avg_check": avg_check,
         "avg_check_all_statuses": avg_check_all,
         "avg_quantity": avg_qty,
+        "status_distribution": dict(status_breakdown(orders)),
     }
 
 
@@ -531,6 +532,25 @@ def generate_report(orders, date_from, date_to, stats, status_dist, daily, weekl
     # ── Что обратить внимание ──────────────────────────────────────
     md.append("## ⚠️ На что обратить внимание\n")
     flags = []
+
+    # 100% (или почти 100%) заказов в одном статусе — самая серьёзная аномалия
+    status_dist = stats.get("status_distribution") or status_breakdown(orders)
+    total_o = sum(status_dist.values())
+    if total_o > 0:
+        for st_id, cnt in status_dist.items():
+            pct = cnt / total_o * 100
+            if pct >= 95 and st_id not in (STATUS_DELIVERED,):
+                # 95%+ в одном НЕ-доставленном статусе — критично
+                st_name = {1: "Новый", 2: "В обработке", 4: "Не доставлен", 6: "Доставляется"}.get(st_id, f"id={st_id}")
+                flags.append(
+                    f"- 🔴 **{pct:.0f}% заказов в статусе «{st_name}»** — критическая аномалия. "
+                    f"Магазин не закрывает заказы статусом «Доставлен» (id=3), либо менеджеры "
+                    f"не обрабатывают заказы. Выручка ({fmt_money(stats['revenue'])}) посчитана "
+                    f"только по статусу 3 — реальная выручка не отображается. "
+                    f"Проверь процесс обработки заказов в админке."
+                )
+                break
+
     if stats["cancelled_pct"] > 25:
         flags.append(f"- **Высокий % отмен ({stats['cancelled_pct']:.1f}%)** — норма до 15-20%. Проверь воронку: качество лидов, скорость обработки, проблемы с подтверждением.")
     if abc and len(abc) > 10:
