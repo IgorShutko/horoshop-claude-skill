@@ -1,11 +1,11 @@
 ---
 name: horoshop-suite
-description: Полный комплексный аудит магазина на Хорошопе — запускает все остальные скиллы по очереди и собирает единый сводный отчёт. Используй ВСЕГДА когда пользователь просит "полный аудит", "всё проверь", "комплексный аудит магазина", "прогон по всему", "пройдись по всему сайту", "полная проверка". Скилл orchestrator: full-audit → sales-report → content-fill find_gaps → photo-audit → text-quality → consistency → design-extract. Собирает все REPORT.md в один SUITE_REPORT.md с executive summary.
+description: Полный комплексный аудит магазина на Хорошопе — запускает все остальные скиллы по очереди и собирает единый сводный отчёт. Используй ВСЕГДА когда пользователь просит "полный аудит", "всё проверь", "комплексный аудит магазина", "прогон по всему", "пройдись по всему сайту", "полная проверка". Скилл orchestrator: full-audit → sales-report → content-fill find_gaps → photo-audit → text-quality → consistency. Собирает все REPORT.md в один SUITE_REPORT.md с executive summary.
 ---
 
 # Horoshop Suite — комплексный аудит
 
-Мета-оркестратор: запускает все 7 скиллов в одном flow и собирает сводный отчёт.
+Мета-оркестратор: запускает 6 скиллов в одном flow и собирает сводный отчёт.
 
 ## Что включает
 
@@ -16,7 +16,6 @@ description: Полный комплексный аудит магазина н�
 4. horoshop-photo-audit      → PHOTO_REPORT.md (фото)
 5. horoshop-text-quality     → TEXT_QUALITY_REPORT.md (тексты)
 6. horoshop-consistency      → CONSISTENCY_REPORT.md (противоречия)
-7. horoshop-design-extract   → DESIGN_SYSTEM.md (бренд)
 ```
 
 После — `run_suite.py` собирает **SUITE_REPORT.md**:
@@ -38,12 +37,11 @@ HOROSHOP_DOMAIN=<DOMAIN> HOROSHOP_LOGIN=<LOGIN> HOROSHOP_PASSWORD=<PASSWORD> \
 - `--skip <names>` — пропустить отдельные скиллы (через запятую)
 - `--only <names>` — запустить только указанные. **Не перетирает** SUITE_REPORT.md остальных скиллов — он мержится с артефактами на диске
 - `--from 2026-04-01 --to 2026-04-30` — период для sales-report (default: последние 30 дней). Без явного указания скилл предупредит
-- `--site-url https://...` — для design-extract (если домен ≠ публичный URL)
 - `--check-sizes` — для photo-audit: HEAD-запросы на каждое фото для проверки веса (медленнее). Без флага — только количество. Скилл предупредит
 - `--skip-preflight` — пропустить проверку зависимостей и auth перед запуском (по умолчанию выполняется)
 
 ### Что делает preflight
-1. Проверяет что установлены `requests`, `bs4`, `lxml`. Если нет — падает с инструкцией поставить (а не валит 7 скиллов один за одним).
+1. Проверяет что установлены `requests`, `bs4`, `lxml`. Если нет — падает с инструкцией поставить (а не валит 6 скиллов один за одним).
 2. Делает auth-проверку через API. Если креды плохие — падает сразу (а не через 5 минут).
 
 Скрипт ищет другие скиллы в `~/.claude/skills/horoshop-*/scripts/` (стандартный путь установки через `install.sh`).
@@ -59,7 +57,6 @@ suite_<domain>/
 ├── PHOTO_REPORT.md          ← horoshop-photo-audit
 ├── TEXT_QUALITY_REPORT.md   ← horoshop-text-quality
 ├── CONSISTENCY_REPORT.md    ← horoshop-consistency
-├── DESIGN_SYSTEM.md         ← horoshop-design-extract
 ├── gaps.json                ← horoshop-content-fill (товары с пустыми полями)
 └── orders.json + abc.csv    ← из sales-report
 ```

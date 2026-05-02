@@ -43,13 +43,6 @@ CONSISTENCY_REPORT.md
 consistency.json
 consistency_*/
 
-# Артефакты design-extract (логотипы — собственность клиента)
-DESIGN_SYSTEM.md
-design.json
-design_*/
-assets/logo.*
-assets/favicon.*
-
 # Артефакты marketing-psych
 targets.json
 proposed_psych.json

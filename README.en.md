@@ -25,7 +25,9 @@ These skills are open-source tools we use ourselves on e-commerce clients runnin
 
 ## 📦 Skills in this repo
 
-9 independent skills + 1 meta-orchestrator. Installed together, triggered by phrases in chat.
+7 independent skills + 1 meta-orchestrator. Installed together, triggered by phrases in chat.
+
+> **Selection rule:** repo only contains what's **API-fixable** or **manually fixable in admin**. Skills that "detect but can't fix" are out.
 
 | Skill | What it does | Trigger |
 |---|---|---|
@@ -35,9 +37,8 @@ These skills are open-source tools we use ourselves on e-commerce clients runnin
 | **[`horoshop-content-fill`](horoshop-content-fill/)** | Find products with empty `description`/`short_description`/`marketplace_description` + brand-aware generation + API import with preview | "fill empty descriptions", "write marketplace description" |
 | **[`horoshop-photo-audit`](horoshop-photo-audit/)** | Photo audit: products with <N photos, duplicate main images, optional file size via HEAD requests | "check product photos", "image audit" |
 | **[`horoshop-text-quality`](horoshop-text-quality/)** | Text quality: AI-slop, marketing fluff, repeated words, CAPS LOCK, long sentences | "find ChatGPT-generated text", "check description quality" |
-| **[`horoshop-consistency`](horoshop-consistency/)** | Conflicts between text and characteristics: material/country/color/size mismatches | "contradictions in cards", "characteristics don't match" |
-| **[`horoshop-design-extract`](horoshop-design-extract/)** | Design system from public homepage: colors, fonts, CSS variables, logo, favicon | "extract brand style", "store design system" |
-| **[`horoshop-marketing-psych`](horoshop-marketing-psych/)** | Strengthen product cards with psychological techniques (scarcity, anchoring, social proof, loss aversion) with preview and import | "marketing tricks for cards", "selling style" |
+| **[`horoshop-consistency`](horoshop-consistency/)** | Conflicts between text and characteristics: material/country/color/size mismatches, discount math, placeholders | "contradictions in cards", "characteristics don't match" |
+| **[`horoshop-marketing-psych`](horoshop-marketing-psych/)** | Strengthen product card text with psychological techniques (scarcity, anchoring, social proof) via `description`/`short_description`. Doesn't write `icons[]` — custom stickers can't be created via API | "marketing tricks for cards", "selling style" |
 
 ---
 
@@ -83,13 +84,13 @@ The skill exports the catalog + categories via API, parses public pages, then ge
 
 ## Installation
 
-### Option 1 — one-liner (all 9 skills at once)
+### Option 1 — one-liner (all 8 skills at once)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IgorShutko/horoshop-claude-skill/main/install.sh | bash
 ```
 
-Installs all 9 skills into `~/.claude/skills/horoshop-*` + Python deps.
+Installs all 8 skills into `~/.claude/skills/horoshop-*` + Python deps.
 
 ### Option 2 — manual, selective
 
@@ -121,7 +122,6 @@ After installation, in any Claude Code chat write what you need:
 | Photo audit | `Check product photos` |
 | Text quality | `Find ChatGPT-generated text in cards` |
 | Consistency | `Check characteristics for contradictions` |
-| Design system | `Extract brand style from homepage` |
 | Marketing tricks | `Add marketing techniques to top products` |
 
 Claude will:
@@ -171,9 +171,8 @@ horoshop-claude-skill/
 ├── horoshop-photo-audit/       # photo audit
 ├── horoshop-text-quality/      # text quality / AI-slop
 ├── horoshop-consistency/       # text ↔ characteristics conflicts
-├── horoshop-design-extract/    # brand style from public homepage
-├── horoshop-marketing-psych/   # psych techniques for conversion
-├── install.sh                  # Installs all 9 skills
+├── horoshop-marketing-psych/   # psych techniques (text only) for conversion
+├── install.sh                  # Installs all 8 skills
 ├── README.md / README.uk.md / README.en.md
 └── LICENSE
 ```

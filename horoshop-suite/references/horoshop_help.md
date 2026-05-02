@@ -14,8 +14,7 @@
 | Заполнение пустых полей через API | `~/.claude/skills/horoshop-content-fill/references/horoshop_help.md` |
 | Фото, галереи, водяной знак, логотип | `~/.claude/skills/horoshop-photo-audit/references/horoshop_help.md` |
 | Характеристики, цвета, шаблон данных | `~/.claude/skills/horoshop-consistency/references/horoshop_help.md` |
-| Дизайн-система, темы, шрифты | `~/.claude/skills/horoshop-design-extract/references/horoshop_help.md` |
-| Стикеры, акции, скидки, оплата частями | `~/.claude/skills/horoshop-marketing-psych/references/horoshop_help.md` |
+| Скидки, оплата частями, countdown, gifts | `~/.claude/skills/horoshop-marketing-psych/references/horoshop_help.md` |
 
 ---
 
@@ -60,9 +59,9 @@
 | Налаштування → Користувачі | Создание API-юзера | Все скиллы (через `references/api_admin_setup.md`) |
 | Маркетинг → SEO → SEO шаблоны | SEO для категорий и товаров | `horoshop-full-audit` (категорийный SEO как «то что надо в админке») |
 | Маркетинг → SEO → sitemap.xml | Перегенерация sitemap | Не покрывается (платформа сама) |
-| Сайт → Стикери для товарів | Создание кастомных стикеров | `horoshop-marketing-psych` (валидирует существование) |
-| Сайт → Дизайн → Редактор дизайна | Стиль стикеров, темы, баннеры | `horoshop-design-extract` (читает результат) |
-| Налаштування → Загальні налаштування → Логотипи | Загрузка логотипа | `horoshop-design-extract` (скачивает текущий) |
+| Сайт → Стикери для товарів | Создание кастомных стикеров | Только админка (через API создать нельзя) |
+| Сайт → Дизайн → Редактор дизайна | Стиль стикеров, темы, баннеры | Только админка |
+| Налаштування → Загальні налаштування → Логотипи | Загрузка логотипа | Только админка |
 | Налаштування → Способи оплати | Подключение онлайн-оплаты, Оплата частями | `horoshop-full-audit` (включает через API когда возможно) |
 | Налаштування → Способи доставки | Нова Пошта, Укрпочта | `horoshop-sales-report` (читает статистику) |
 | Маркетинг → Знижки → Карта клієнта | Персональные скидки | Не через API |

@@ -122,16 +122,6 @@ def select_targets(products, args):
                 if val and val.strip():
                     chars[k] = val.strip()
 
-        icons = []
-        for ic in (p.get("icons") or []):
-            if isinstance(ic, dict):
-                v = ic.get("value", {})
-                name = v.get("ua") or v.get("ru") or "" if isinstance(v, dict) else str(v)
-            else:
-                name = str(ic)
-            if name:
-                icons.append(name)
-
         candidates.append({
             "article": article,
             "title": title,
@@ -140,7 +130,6 @@ def select_targets(products, args):
             "discount_pct": round((price_old - price) / price_old * 100, 1) if has_discount else 0,
             "has_discount": has_discount,
             "characteristics": chars,
-            "icons_current": icons,
             "existing_short_description": strip_html(get_text(p.get("short_description")))[:300],
         })
 

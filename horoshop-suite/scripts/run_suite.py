@@ -5,7 +5,6 @@
   python3 run_suite.py [--skip photo,consistency]
                        [--only audit,sales]
                        [--from 2026-04-01 --to 2026-04-30]
-                       [--site-url https://example.com.ua]
 
 Конфиг env: HOROSHOP_DOMAIN, HOROSHOP_LOGIN, HOROSHOP_PASSWORD
 """
@@ -34,7 +33,6 @@ SKILLS = {
     "photo":       ("horoshop-photo-audit",       "scripts/photo_audit.py",          True),
     "text":        ("horoshop-text-quality",      "scripts/text_quality.py",         True),
     "consistency": ("horoshop-consistency",       "scripts/check_consistency.py",    True),
-    "design":      ("horoshop-design-extract",    "scripts/extract.py",              False),  # парсит публичный сайт
 }
 
 
@@ -78,7 +76,6 @@ def validate_artifact(skill_name):
         "photo": ("PHOTO_REPORT.md", _validate_md_with_sections),
         "text": ("TEXT_QUALITY_REPORT.md", _validate_md_with_sections),
         "consistency": ("CONSISTENCY_REPORT.md", _validate_md_with_sections),
-        "design": ("DESIGN_SYSTEM.md", _validate_design_md),
     }
 
     if skill_name not in artifact_map:
@@ -122,23 +119,6 @@ def _validate_gaps_json(fpath):
         return "partial", f"невалідний JSON: {e}"
 
 
-def _validate_design_md(fpath):
-    """DESIGN_SYSTEM.md — главное: НЕТ маркера 'НЕ ВДАЛОСЯ ВИТЯГТИ'."""
-    txt = Path(fpath).read_text(encoding="utf-8")
-    if "НЕ ВДАЛОСЯ ВИТЯГТИ" in txt or "extracted: false" in txt.lower():
-        return "partial", "extract провалився, потрібен PLAYWRIGHT=1"
-    # Должно быть хоть что-то из {логотип, цвета, шрифты}
-    has_logo = "Логотип:" in txt and "Логотип: `—`" not in txt
-    has_colors = "## 🎨 Топ-15 цветов" in txt or "Цветов уникальных: 0" not in txt
-    has_fonts = "## 🔤 Шрифты" in txt
-    score = sum([has_logo, has_colors, has_fonts])
-    if score == 0:
-        return "partial", "ні лого, ні кольорів, ні шрифтів"
-    if score < 2:
-        return "partial", f"тільки {score}/3 артефактів"
-    return "ok", f"{score}/3 артефактів"
-
-
 def read_safe(path, max_lines=None):
     if not Path(path).exists():
         return ""
@@ -177,7 +157,6 @@ SKILL_REPORT_FILES = {
     "photo": "PHOTO_REPORT.md",
     "text": "TEXT_QUALITY_REPORT.md",
     "consistency": "CONSISTENCY_REPORT.md",
-    "design": "DESIGN_SYSTEM.md",
 }
 
 
@@ -186,7 +165,7 @@ def generate_suite_report(domain, completed_skills, args):
 
     Важно: проходит по ВСЕМ скиллам списка (не только по completed_skills),
     проверяя наличие соответствующих артефактов на диске.
-    Это позволяет использовать --only audit,design без перетирания
+    Это позволяет использовать --only audit,sales без перетирания
     summary остальных скиллов из предыдущих запусков.
     """
     md = []
@@ -266,18 +245,6 @@ def generate_suite_report(domain, completed_skills, args):
             md.append("")
         except Exception:
             pass
-
-    # 7. Design system
-    if has("design"):
-        md.append("### 🎨 Дизайн-система ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md))\n")
-        design_txt = Path("DESIGN_SYSTEM.md").read_text(encoding="utf-8")
-        m = re.search(r"## 🎨 Топ-15 цветов[\s\S]*?\n([\s\S]*?)\n## ", design_txt)
-        if m:
-            md.append("Топ цветов и шрифтов извлечены — см. файл.\n")
-        # Если CSS не нашёлся — design-extract вернул нули. Предупредим.
-        if "Цветов уникальных: 0" in design_txt or "## 🎨 Топ-15 цветов" not in design_txt:
-            md.append("⚠️ **Дизайн-система не извлечена** — публічна головна не дала CSS/HTML "
-                      "(можливо JS-рендер, WAF або lending без зовнішніх стилів). Перевір вручну.\n")
 
     # ── Статус виконання ─────────────────────────────────────────
     md.append("## 📦 Статус скілів\n")
@@ -371,7 +338,6 @@ def main():
     parser.add_argument("--only", default="", help="Запустить только эти")
     parser.add_argument("--from", dest="date_from", default=None, help="Период для sales (YYYY-MM-DD)")
     parser.add_argument("--to", dest="date_to", default=None, help="Период для sales")
-    parser.add_argument("--site-url", default=None, help="URL для design-extract")
     parser.add_argument("--check-sizes", action="store_true",
                         help="Передать --check-sizes в photo-audit (HEAD-запросы, медленнее)")
     parser.add_argument("--skip-preflight", action="store_true",
@@ -430,8 +396,6 @@ def main():
         print("   Скрипт порахує тільки кількість фото, не перевіряючи їх вагу.")
         print("   Для повного аудиту: передай --check-sizes (повільніше, ~1 HEAD-запит на товар).\n")
 
-    site_url = args.site_url or f"https://{DOMAIN}/"
-
     for name in selected:
         log_path = Path("logs") / f"{name}.log"
         if name == "audit":
@@ -451,8 +415,6 @@ def main():
                 ok, status = run_skill(name, ["--from-file", cat_path] + extra, env, log_path)
             else:
                 ok, status = run_skill(name, extra, env, log_path)
-        elif name == "design":
-            ok, status = run_skill(name, ["--url", site_url], env, log_path)
         else:
             ok, status = False, "unknown"
 
@@ -483,7 +445,6 @@ def main():
         "args": {
             "from": args.date_from,
             "to": args.date_to,
-            "site_url": args.site_url,
             "check_sizes": args.check_sizes,
             "skip": args.skip,
             "only": args.only,

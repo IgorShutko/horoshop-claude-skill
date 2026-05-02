@@ -14,7 +14,6 @@ SKILLS=(
   "horoshop-photo-audit"
   "horoshop-text-quality"
   "horoshop-consistency"
-  "horoshop-design-extract"
   "horoshop-marketing-psych"
   "horoshop-suite"
 )
