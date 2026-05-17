@@ -374,6 +374,14 @@ def html_audit(products, sample_size=None):
 SPAM_WORDS = ["БЕСПЛАТНО", "ШОКИРУЮЩАЯ", "ГАРАНТИРОВАНО", "100%", "БЕЗКОШТОВНО", "ШОКУЮЧА", "ГАРАНТОВАНО"]
 SALE_STICKER_KEYWORDS = ["распродаж", "знижк", "sale", "скидк"]
 
+# Сырые HTML-entities, которые покупатель видит буквально (артефакт импорта).
+# Синхронизировано с ENTITY_RE в apply_fixes.py (fix decode-entities).
+HTML_ENTITY_RE = re.compile(
+    r"&(?:nbsp|amp|quot|lt|gt|ndash|mdash|laquo|raquo|lsquo|rsquo|ldquo|rdquo|"
+    r"hellip|deg|sup\d|sub\d|times|divide|copy|reg|trade|euro|pound|sect|para|"
+    r"middot|bull|dagger|permil|frac\d\d|[a-z]{2,8}|#\d{2,5}|#x[0-9a-fA-F]{2,4});"
+)
+
 
 def audit_products(products):
     print("[3/4] Аудит товарів...")
@@ -567,6 +575,17 @@ def audit_products(products):
             mp_desc = strip_html(get_text(p.get("marketplace_description")))
             if not mp_desc:
                 findings["marketplace_description_empty"].append({"article": article, "title": title})
+
+            # Сырые HTML-entities в текстовых полях (видны покупателю буквально)
+            ent_total = 0
+            for _fld in ("description", "short_description", "marketplace_description"):
+                _raw = get_text(p.get(_fld))
+                if _raw:
+                    ent_total += len(HTML_ENTITY_RE.findall(_raw))
+            if ent_total > 0:
+                findings["html_entities"].append({
+                    "article": article, "title": title, "count": ent_total,
+                })
 
             # Brand
             brand = p.get("brand") or {}
@@ -923,6 +942,14 @@ def generate_report(products, categories, html, audit_data):
             "HTML захаращений `style=\"...\"` атрибутами. Не критично, але сповільнює рендер і конфліктує з темою.",
             "`apply_fixes.py --fix inline-styles --preview-only` → переглянути → запустити без `--preview-only`."
         ))
+    if n("html_entities"):
+        ent_sum = sum(x.get("count", 0) for x in f.get("html_entities", []))
+        fixes.append((
+            f"Сирі HTML-entities в описах — {n('html_entities')} товарів (~{ent_sum} entities)",
+            "Покупець бачить буквально `&ndash;` `&deg;` `&laquo;` замість `–` `°` `«`. "
+            "Артефакт імпорту (подвійне екранування). Виглядає неохайно, псує сприйняття.",
+            "`apply_fixes.py --fix decode-entities --preview-only` → переглянути before→after → запустити без `--preview-only`."
+        ))
     if n("no_accessories") + n("no_alt_parent") > 5:
         fixes.append((
             f"Cross-sell не налаштовано — accessories/alt_parent у {n('no_accessories')} товарів",
@@ -1112,6 +1139,7 @@ def generate_report(products, categories, html, audit_data):
         "marketplace_description_empty": ("Порожній marketplace_description (для фідів)", "🟢 заповнити через `horoshop-content-fill --fields marketplace_description`"),
         "no_marketplaces": ("Товар не вигружається на маркетплейси (порожній export_to_marketplace)", "🟡 в адмінці: Каталог → Товари → Вигрузка на маркетплейси, або через API `export_to_marketplace`"),
         "no_images": ("Зовсім без фото", "🔴 критично: товар невидимий у листингу. Додати фото в адмінці або через `horoshop-photo-audit`"),
+        "html_entities": ("Сирі HTML-entities в описах (&ndash; &deg; &laquo;)", "🟢 fix через API: `decode-entities`"),
     }
 
     md.append("| # | Знахідка | Кількість | Як чинити |")
