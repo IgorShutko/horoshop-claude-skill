@@ -15,6 +15,7 @@
   sticker-sale     — добавление стикера Распродажа в icons
   inline-styles    — очистка inline-стилей в описаниях (с превью)
   cross-sell       — настройка accessories/alt_parent (interactive)
+  decode-entities  — раскодирование сырых HTML-entities (&ndash; &deg; &nbsp;) в описаниях (с превью)
 
 Конфиг через env: HOROSHOP_DOMAIN, HOROSHOP_LOGIN, HOROSHOP_PASSWORD, HOROSHOP_LANG (default ua)
 
@@ -25,6 +26,7 @@
 """
 
 import argparse
+import html as html_lib
 import json
 import os
 import re
@@ -612,6 +614,99 @@ def fix_cross_sell(args):
         import_products(updates, dry_run=args.dry_run, fix_name="cross_sell")
 
 
+# ─── Fix 11: decode-entities ─────────────────────────────────────────────
+
+# Сырые HTML-entities, которые покупатель видит буквально в тексте.
+# Артефакт импорта (двойное экранирование при выгрузке из CSV/старого движка).
+ENTITY_RE = re.compile(
+    r"&(?:nbsp|amp|quot|lt|gt|ndash|mdash|laquo|raquo|lsquo|rsquo|ldquo|rdquo|"
+    r"hellip|deg|sup\d|sub\d|times|divide|copy|reg|trade|euro|pound|sect|para|"
+    r"middot|bull|dagger|permil|frac\d\d|[a-z]{2,8}|#\d{2,5}|#x[0-9a-fA-F]{2,4});"
+)
+
+
+def _decode_entities(text):
+    """html.unescape, но защищаем валидный HTML-разметку.
+
+    Хитрость: &lt; / &gt; / &amp; внутри уже HTML-текста — обычно НЕ ошибка
+    (это экранированный код в примерах). Но &nbsp; &ndash; &deg; и т.п. —
+    почти всегда мусор импорта. unescape() их раскроет в нормальные символы.
+    """
+    return html_lib.unescape(text)
+
+
+def fix_decode_entities(args):
+    products = load_catalog()
+    main = [p for p in products if p.get("article") == p.get("parent_article")]
+
+    updates = []
+    previews = []
+    FIELDS = ("description", "short_description", "marketplace_description")
+
+    for p in main:
+        upd = {"article": p["article"]}
+        changed = False
+        sample_before = sample_after = ""
+        ent_count = 0
+        for fld in FIELDS:
+            raw = get_text(p.get(fld))
+            if not raw:
+                continue
+            found = ENTITY_RE.findall(raw)
+            if not found:
+                continue
+            decoded = _decode_entities(raw)
+            if decoded != raw:
+                upd[fld] = {LANG: decoded}
+                changed = True
+                ent_count += len(found)
+                if not sample_before:
+                    idx = ENTITY_RE.search(raw)
+                    s = max(0, idx.start() - 40) if idx else 0
+                    sample_before = raw[s:s + 120]
+                    sample_after = decoded[s:s + 120]
+        if changed:
+            updates.append(upd)
+            if len(previews) < 3:
+                previews.append({
+                    "article": p["article"],
+                    "title": get_text(p.get("title")),
+                    "entities": ent_count,
+                    "before": sample_before,
+                    "after": sample_after,
+                })
+
+    if not updates:
+        print("HTML-entities не знайдено — нечего декодувати. ✅")
+        return
+
+    total_entities = sum(
+        len(ENTITY_RE.findall(get_text(p.get(f))))
+        for p in main for f in FIELDS if get_text(p.get(f))
+    )
+    print(f"\nТоварів з сирими HTML-entities: {len(updates)}")
+    print(f"Усього entities знайдено: ~{total_entities}")
+    print("\nПревью перших 3 (before → after):\n")
+    for pv in previews:
+        print(f"[{pv['article']}] {pv['title']}  ({pv['entities']} entities)")
+        print(f"  ДО:    …{pv['before']}…")
+        print(f"  ПОСЛЕ: …{pv['after']}…")
+        print()
+
+    if args.preview_only:
+        out = Path(f"decode_entities_preview_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+        out.write_text(json.dumps(updates, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"Превью збережено: {out}")
+        return
+
+    if not args.dry_run:
+        ans = input(f"\nДекодувати entities у {len(updates)} товарів? (y/N): ").strip().lower()
+        if ans != "y":
+            return
+
+    import_products(updates, dry_run=args.dry_run, fix_name="decode_entities")
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────────
 
 DISPATCH = {
@@ -625,6 +720,7 @@ DISPATCH = {
     "sticker-sale": fix_sticker_sale,
     "inline-styles": fix_inline_styles,
     "cross-sell": fix_cross_sell,
+    "decode-entities": fix_decode_entities,
 }
 
 

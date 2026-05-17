@@ -167,13 +167,52 @@ def get_top_level_value(p, key):
     return val.strip().lower() if val and val.strip() else None
 
 
-# Шаблонные плейсхолдеры (lorem ipsum, tbd, заполнить позже и т.д.)
-PLACEHOLDER_PHRASES = [
-    "lorem ipsum", "lorem ip", "dolor sit", "todo", "tbd", "tba",
-    "заполнить", "заполнить позже", "опис буде",
-    "test test", "тест тест", "xxxxxx", "######",
-    "placeholder", "заглушка",
+# Плейсхолдеры — domain-aware матчинг (false positives на hardware-каталогах).
+#
+# STRONG: однозначные маркеры. Любое substring-вхождение = placeholder.
+# (Это фразы, которые НИКОГДА не встречаются в нормальном товаре.)
+STRONG_PLACEHOLDERS = [
+    "lorem ipsum", "lorem ip", "dolor sit amet",
+    "заполнить позже", "заповнити пізніше", "опис буде пізніше",
+    "тест тест", "test test test", "xxxxxx", "######",
+    "описание описание", "опис опис",
 ]
+
+# WEAK: короткие/неоднозначные токены. Требуют:
+#   1) совпадения по ГРАНИЦЕ слова (\btoken\b) — чтобы не ловить внутри SKU
+#      (напр. "tba" в коде детали 14AM00TBAS)
+#   2) ДОМИНИРОВАНИЯ маркера в поле — текст должен быть коротким,
+#      а не 500-символьное описание с одним "todo" где-то в середине
+WEAK_PLACEHOLDERS = ["todo", "tbd", "tba", "n/a", "xxx", "заглушка-текст"]
+WEAK_RE = {w: re.compile(r"\b" + re.escape(w) + r"\b", re.IGNORECASE) for w in WEAK_PLACEHOLDERS}
+
+# ВАЖНО: «заглушка» / «placeholder» УДАЛЕНЫ из списков —
+# в hardware-каталогах «заглушка» это реальный товар
+# (socket blanking plug, торцевая заглушка для полива, заглушка горячего башмака).
+# Это нарушало заявленный принцип «низкий recall, высокая точность».
+
+
+def detect_placeholders(title, description, short_desc):
+    """Domain-aware детект плейсхолдеров. Возвращает список найденных маркеров."""
+    full = (title + " " + description + " " + short_desc)
+    full_lower = full.lower()
+    found = []
+
+    # STRONG — substring match (эти фразы безопасны)
+    for ph in STRONG_PLACEHOLDERS:
+        if ph in full_lower:
+            found.append(ph)
+
+    # WEAK — только если маркер ДОМИНИРУЕТ в коротком тексте.
+    # Эвристика: суммарная длина значимого текста < 60 символов
+    # (т.е. поле фактически пустое, кроме плейсхолдера).
+    stripped = full.strip()
+    if len(stripped) < 60:
+        for w, rx in WEAK_RE.items():
+            if rx.search(full):
+                found.append(w)
+
+    return found
 
 
 def analyze(products):
@@ -275,9 +314,8 @@ def analyze(products):
         except (TypeError, ValueError):
             pass
 
-        # ── 6: плейсхолдеры в текстах ────────────────────────────────────
-        text_to_check = (title + " " + description + " " + short_desc).lower()
-        found_placeholders = [ph for ph in PLACEHOLDER_PHRASES if ph in text_to_check]
+        # ── 6: плейсхолдеры в текстах (domain-aware) ─────────────────────
+        found_placeholders = detect_placeholders(title, description, short_desc)
         if found_placeholders:
             findings["placeholder_text"].append({
                 "article": article, "title": title,

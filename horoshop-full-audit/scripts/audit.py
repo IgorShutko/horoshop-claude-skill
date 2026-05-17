@@ -263,7 +263,42 @@ def html_audit(products, sample_size=None):
     except Exception:
         pass
 
+    # Fallback: если прямой catalog-sitemap пуст — ищем через sitemap-index.
+    # На некоторых магазинах структура sitemap другая (sitemap.xml — индекс
+    # с под-картами, либо catalog разбит на catalog-sitemap-1.xml и т.д.).
+    if not catalog_urls:
+        try:
+            sc, idx_txt, _, _, _ = fetch(f"{base}/sitemap.xml")
+            if sc == 200:
+                sub_sitemaps = re.findall(r"<loc>(.*?)</loc>", idx_txt)
+                # Если это индекс под-карт (а не плоский список URL товаров)
+                catalog_sm_candidates = [
+                    s for s in sub_sitemaps
+                    if any(k in s.lower() for k in ("catalog", "product", "tovar"))
+                ]
+                for sub in catalog_sm_candidates[:10]:  # лимит чтобы не висеть
+                    try:
+                        sc2, sub_txt, _, _, _ = fetch(sub)
+                        if sc2 == 200:
+                            catalog_urls.extend(re.findall(r"<loc>(.*?)</loc>", sub_txt))
+                    except Exception:
+                        continue
+                # Если sitemap.xml — плоский (не индекс) и в нём есть товарные URL
+                if not catalog_urls and not sub_sitemaps:
+                    flat = re.findall(r"<loc>(.*?)</loc>", idx_txt)
+                    # эвристика: товарный URL обычно содержит /p или числовой хвост
+                    catalog_urls = [u for u in flat if re.search(r"/p\d|/\d{4,}", u)]
+        except Exception:
+            pass
+
+    # Защита от случая когда pages-sitemap вернул товары вперемешку
+    catalog_urls = list(dict.fromkeys(catalog_urls))  # dedup, сохранить порядок
+
+    catalog_phase_ok = len(catalog_urls) > 0
     print(f"  pages в sitemap: {len(pages_urls)}, catalog: {len(catalog_urls)}")
+    if not catalog_phase_ok:
+        print("  ⚠️ catalog-sitemap порожній / не знайдено товарних URL — "
+              "HTML-фаза товарів НЕ відпрацює (on-page OG, cross-sell блоки неповні)")
 
     pages_data = []
     for i, url in enumerate(pages_urls):
@@ -329,6 +364,8 @@ def html_audit(products, sample_size=None):
             "pages_in_sitemap": len(pages_urls),
             "catalog_in_sitemap": len(catalog_urls),
         },
+        "catalog_phase_ok": catalog_phase_ok,
+        "products_parsed": len(products_data),
     }
 
 
@@ -713,14 +750,50 @@ def generate_report(products, categories, html, audit_data):
     # HTML-аудит проблем категорий
     cat_pages = [p for p in html.get("pages", []) if not p.get("error")]
 
-    # Классификация страниц
-    INFO_KEYWORDS = ["pro-nas", "dohovir", "oplata", "obmin", "kontakt", "privacypolicy", "dohliad", "brands", "publichnoi", "polityka"]
+    # Классификация страниц. pages/export Хорошопа возвращает ВСЕ страницы:
+    # категории + инфо/сервисные (contacts, delivery, политики) + языковые
+    # главные (/ua/, /ru/). Без фильтра счётчики «N категорій» завышены мусором.
+    INFO_KEYWORDS = [
+        # Контакты / о нас
+        "pro-nas", "about", "kontakt", "contacts", "contact",
+        # Доставка / оплата / возврат / обмен
+        "dohovir", "oplata", "payment", "delivery", "dostavka", "delivery_info",
+        "obmin", "return", "return_policy", "povernennya", "garantiya", "warranty",
+        # Юридическое
+        "privacypolicy", "publichnoi", "polityka", "privacy", "terms",
+        "ugoda", "oferta", "cookie",
+        # Прочие сервисные
+        "dohliad", "brands", "brand-list", "blog", "news", "novini", "akcii",
+        "sitemap", "search", "cart", "checkout", "wishlist", "compare",
+        "vacancy", "vakansii", "faq", "dopomoga", "help",
+    ]
     def is_home(p):
-        return p["url"].rstrip("/") == f"https://{DOMAIN}"
+        u = p["url"].rstrip("/")
+        # Голая главная ИЛИ языковой префикс главной (/ua/, /ru/, /en/)
+        return (
+            u == f"https://{DOMAIN}"
+            or re.fullmatch(rf"https://{re.escape(DOMAIN)}/[a-z]{{2}}", u) is not None
+        )
     def is_info(p):
-        return any(k in p["url"] for k in INFO_KEYWORDS)
+        path = p["url"].replace(f"https://{DOMAIN}", "").strip("/").lower()
+        # Языковой префикс отрезаем для матчинга (/ua/delivery_info → delivery_info)
+        parts = path.split("/")
+        if parts and len(parts[0]) == 2 and parts[0].isalpha():
+            path = "/".join(parts[1:])
+        # Сервисная если первый сегмент — известное info-слово
+        first_seg = path.split("/")[0] if path else ""
+        return any(kw == first_seg or kw in path for kw in INFO_KEYWORDS)
     def is_category(p):
         return not is_home(p) and not is_info(p)
+
+    def page_label(p, max_len=70):
+        """Для примеров: показываем САМ title + его длину, а не URL-слаг."""
+        title = (p.get("title") or "").strip()
+        path = p["url"].replace(f"https://{DOMAIN}", "")
+        if title:
+            t = title[:max_len] + ("…" if len(title) > max_len else "")
+            return f'"{t}" ({len(title)} симв) — {path}'
+        return f"(title порожній) — {path}"
 
     # Длинные title — отдельно категории и инфо
     cat_long_title = [p for p in cat_pages if is_category(p) and len(p.get("title") or "") > 70]
@@ -736,6 +809,23 @@ def generate_report(products, categories, html, audit_data):
     md.append(f"# SEO-аудит {DOMAIN}\n")
     md.append(f"**Дата:** {today}")
     md.append(f"**Метод:** Horoshop API (`catalog/export`, `pages/export`) + HTML-парсинг публічних сторінок\n")
+
+    # Предупреждение о неполноте HTML-фазы товаров (если catalog-sitemap пуст)
+    if not html.get("catalog_phase_ok", True):
+        md.append(
+            "> ⚠️ **HTML-фаза товарів не відпрацювала.** Catalog-sitemap порожній або "
+            "не знайдено товарних URL. Перевірки що залежать від рендеру сторінки товара "
+            "(on-page OG-теги, блок cross-sell, h1 конкретних карток) — **неповні**. "
+            "API-перевірки каталогу (ціни, SEO-поля, дублі, стікери) виконані повністю. "
+            "Можливі причини: нестандартна структура sitemap, закритий robots, "
+            "WAF блокує парсер.\n"
+        )
+    elif html.get("products_parsed", 0) == 0 and html.get("totals", {}).get("catalog_in_sitemap", 0) > 0:
+        md.append(
+            f"> ⚠️ **HTML-фаза товарів: знайдено {html['totals']['catalog_in_sitemap']} URL, "
+            f"але 0 успішно розпарсено.** Сторінки товарів повертають не-200 (WAF / редіректи). "
+            f"Перевірки рендеру неповні; API-аудит виконано повністю.\n"
+        )
 
     md.append("## 📊 Сводка\n")
     md.append("| Метрика | Значення |")
@@ -858,14 +948,14 @@ def generate_report(products, categories, html, audit_data):
             f"### A1. Довгі title у {len(cat_long_title)} категорій (>70 симв)",
             "Google ріже title у видачі до ~580 px (~65 симв кирилиці). Хвіст шаблону губиться.",
             "**Маркетинг → SEO → SEO шаблони → Категорії** — скоротити шаблон до ~50-60 симв.",
-            [p["url"].replace(f"https://{DOMAIN}", "") for p in cat_long_title[:5]],
+            [page_label(p) for p in cat_long_title[:5]],
         ))
     if info_long_title:
         admin_items.append((
             f"### A2. Довгі title у {len(info_long_title)} інфо-сторінок (>70 симв)",
             "Те саме що для категорій — Google обрізає в SERP.",
             "Кожна інфо-сторінка редагується окремо: **Сторінки сайту → [сторінка] → SEO заголовок**.",
-            [p["url"].replace(f"https://{DOMAIN}", "") for p in info_long_title[:5]],
+            [page_label(p) for p in info_long_title[:5]],
         ))
     if info_no_desc:
         admin_items.append((
@@ -907,7 +997,7 @@ def generate_report(products, categories, html, audit_data):
             f"### G. Категорії без SEO-тексту ({len(cat_no_seotext)} шт)",
             "SEO-текст — основний контент для ранжування за комерційними запитами категорії.",
             "**Каталог → Категорія → SEO-текст** — додати блок 800-2000 симв з h2/h3.",
-            [p["url"].replace(f"https://{DOMAIN}", "") for p in cat_no_seotext[:5]],
+            [page_label(p) for p in cat_no_seotext[:5]],
         ))
 
     if not admin_items:
@@ -1015,6 +1105,13 @@ def generate_report(products, categories, html, audit_data):
         "dup_seo_description": ("Дублі SEO-description", "🟢 переписати через API"),
         "dup_h1": ("Дублі h1_title", "🟢 переписати через API"),
         "seo_description_long": ("SEO-description довший за 160 символів", "🟢 скоротити через API: `seo`"),
+        # Друга хвиля самодіагностики (hardware-каталог 5619 товарів):
+        "description_empty": ("Порожній description", "🟢 заповнити через `horoshop-content-fill`"),
+        "description_short": ("Занадто короткий description (<200 симв)", "🟢 розширити через `horoshop-content-fill`"),
+        "short_description_empty": ("Порожній short_description", "🟢 заповнити через `horoshop-content-fill`"),
+        "marketplace_description_empty": ("Порожній marketplace_description (для фідів)", "🟢 заповнити через `horoshop-content-fill --fields marketplace_description`"),
+        "no_marketplaces": ("Товар не вигружається на маркетплейси (порожній export_to_marketplace)", "🟡 в адмінці: Каталог → Товари → Вигрузка на маркетплейси, або через API `export_to_marketplace`"),
+        "no_images": ("Зовсім без фото", "🔴 критично: товар невидимий у листингу. Додати фото в адмінці або через `horoshop-photo-audit`"),
     }
 
     md.append("| # | Знахідка | Кількість | Як чинити |")

@@ -183,11 +183,12 @@ EM_DASH_RE = re.compile(r"\w—\w")
 # 10. Дубли слов
 DUP_WORDS_RE = re.compile(r"\b(\w{2,})\s+\1\b", re.IGNORECASE)
 
-# 11. Caps lock
-CAPS_LOCK_RE = re.compile(r"\b[А-ЯЁІЇЄҐA-Z]{6,}\b")
+# 11. Caps lock — слово из 6+ заглавных. Цифры внутри = SKU-подобное, скипаем отдельно.
+CAPS_LOCK_RE = re.compile(r"\b[А-ЯЁІЇЄҐA-Z][А-ЯЁІЇЄҐA-Z0-9-]{5,}\b")
 
-# 12. Дубли букв (в одном слове, например «оооочень»)
-LETTER_DUP_RE = re.compile(r"(\w)\1{3,}", re.IGNORECASE)
+# 12. Дубли БУКВ (не цифр!): «оооочень» — баг. «30000 мАг» — спека, НЕ баг.
+#     Раньше \w ловил цифры → false positive на спеках hardware.
+LETTER_DUP_RE = re.compile(r"([A-Za-zА-Яа-яЁёІіЇїЄєҐґ])\1{3,}", re.IGNORECASE)
 
 # 13. HTML-entities в тексте — необработанные ампам-сущности
 HTML_ENTITY_RE = re.compile(r"&(?:nbsp|amp|quot|lt|gt|sup\d|times|sub\d|copy|trade|reg|deg|euro|pound|hellip|ldquo|rdquo|lsquo|rsquo|mdash|ndash|laquo|raquo|[a-z]{2,8}|#\d+);", re.IGNORECASE)
@@ -216,15 +217,18 @@ def _find_phrases(plain, phrases, limit=3):
     return found
 
 
-def check_text(text, field_type="text"):
+def check_text(text, field_type="text", brand_title_tokens=None):
     """Возвращает список проблем для одного текста.
 
     field_type: 'description' / 'short_description' / 'marketplace_description' /
                 'title' / 'seo_title' / 'seo_description' / 'h1_title' / 'text'
+    brand_title_tokens: set ALL-CAPS токенов из brand+title товара —
+                        вайтлист для caps_lock (бренды типа INKBIRD не «крик»).
     """
     issues = []
     if not text:
         return issues
+    brand_title_tokens = brand_title_tokens or set()
     raw = text  # с HTML
     plain = strip_html(text).lower()
     plain_orig = strip_html(text)
@@ -303,9 +307,25 @@ def check_text(text, field_type="text"):
     if dups:
         issues.append({"type": "duplicate_words", "examples": list(set(dups))[:3]})
 
-    # 11. CAPS LOCK слова
-    caps = CAPS_LOCK_RE.findall(plain_orig)
-    caps = [c for c in caps if len(c) > 6 and c not in ("GTIN", "USB", "USA", "GMBH")]
+    # 11. CAPS LOCK слова — фильтруем бренды/модели/SKU (шум на hardware-каталогах)
+    KNOWN_ABBR = {"GTIN", "USB", "USA", "GMBH", "LED", "USR", "GPS", "RGB", "PWM",
+                  "API", "HDMI", "VGA", "USBC", "OLED", "LCD", "TFT", "ABS", "PLA",
+                  "MOSFET", "CNC", "OBD", "ESP", "GSM", "NFC", "RFID", "PCB"}
+    caps_raw = CAPS_LOCK_RE.findall(plain_orig)
+    caps = []
+    for c in caps_raw:
+        if len(c) <= 6:
+            continue
+        cu = c.upper()
+        if cu in KNOWN_ABBR:
+            continue
+        # SKU-подобное: содержит цифру или дефис → это модель/артикул, не «крик»
+        if any(ch.isdigit() for ch in c) or "-" in c:
+            continue
+        # Бренд/модель из title/brand товара → не «крик прозы»
+        if cu in brand_title_tokens:
+            continue
+        caps.append(c)
     if caps:
         issues.append({"type": "caps_lock", "examples": list(set(caps))[:3]})
 
@@ -374,6 +394,18 @@ def analyze(products, lang):
         article = p.get("article", "")
         title = get_text(p.get("title"), lang)
 
+        # ALL-CAPS токены из title + brand товара → вайтлист для caps_lock.
+        # На hardware-каталогах бренды (INKBIRD, BIGTREETECH) — это не «крик».
+        brand_val = p.get("brand")
+        if isinstance(brand_val, dict):
+            brand_str = get_text(brand_val, lang) or str(brand_val.get("value", ""))
+        else:
+            brand_str = str(brand_val or "")
+        brand_title_tokens = set()
+        for tok in re.findall(r"[A-Za-zА-Яа-яЁёІіЇїЄєҐґ0-9-]{3,}", f"{title} {brand_str}"):
+            if tok.isupper() or any(ch.isdigit() for ch in tok):
+                brand_title_tokens.add(tok.upper())
+
         texts = {
             "title": title,
             "description": get_text(p.get("description"), lang),
@@ -388,7 +420,7 @@ def analyze(products, lang):
         for field_name, text in texts.items():
             if not text:
                 continue
-            field_issues = check_text(text, field_type=field_name)
+            field_issues = check_text(text, field_type=field_name, brand_title_tokens=brand_title_tokens)
             for issue in field_issues:
                 issue["field"] = field_name
                 product_issues.append(issue)

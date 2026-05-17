@@ -188,6 +188,27 @@ python3 apply_fixes.py --fix cross-sell --interactive
 
 ---
 
+## 11. decode-entities — Раскодирование сырых HTML-entities
+
+**Триггер:** main-товары, в `description` / `short_description` / `marketplace_description` которых есть необработанные HTML-сущности: `&ndash;`, `&mdash;`, `&deg;`, `&nbsp;`, `&laquo;`, `&rsquo;`, `&sup2;`, `&times;` и т.д.
+
+**Причина:** артефакт импорта — двойное экранирование при выгрузке из CSV или старого движка. Покупатель видит буквально `Діагональ 5&deg; &ndash; 10&deg;` вместо `Діагональ 5° – 10°`.
+
+**Чем отличается от inline-styles:** `inline-styles` чистит `style="..."` атрибуты (визуальный мусор в коде). `decode-entities` раскрывает текстовые сущности (мусор, видимый покупателю). Это разные проблемы — на боевом каталоге было ~2019 товаров с entities против ~5 с inline-стилями.
+
+**Что делает:** `html.unescape()` по трём текстовым полям, запись через `catalog/import`.
+
+```bash
+python3 apply_fixes.py --fix decode-entities --preview-only   # посмотреть before→after
+python3 apply_fixes.py --fix decode-entities                  # применить (спросит y/N)
+```
+
+**Превью обязательно** — показывает before/after на 3 товарах + общий счётчик entities. После подтверждения пишет лог `fix_decode_entities_<ts>.json`.
+
+**Edge-case:** `&lt;` / `&gt;` / `&amp;` внутри текста, где это намеренно экранированный код в примерах (редко в e-commerce) — `unescape` их тоже раскроет. На каталогах товаров это почти всегда безопасно, но проверь превью если магазин про программирование/HTML.
+
+---
+
 ## Общие принципы для всех фиксов
 
 1. **Все фиксы поддерживают `--dry-run`** — выводят что будет сделано без записи
